@@ -1,6 +1,6 @@
 #!/bin/sh
 # agent-browser CLI wrapper
-# Detects platform and runs the appropriate native binary
+# Tries native binary first, falls back to Node.js
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
@@ -9,29 +9,20 @@ case "$OS" in
   darwin) OS="darwin" ;;
   linux) OS="linux" ;;
   mingw*|msys*|cygwin*) OS="win32" ;;
-  *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
 esac
 
 case "$ARCH" in
   x86_64|amd64) ARCH="x64" ;;
   aarch64|arm64) ARCH="arm64" ;;
-  *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BINARY="$SCRIPT_DIR/agent-browser-${OS}-${ARCH}"
 
-if [ "$OS" = "win32" ]; then
-  BINARY="agent-browser-${OS}-${ARCH}.exe"
-else
-  BINARY="agent-browser-${OS}-${ARCH}"
+# Try native binary if it exists
+if [ -f "$BINARY" ] && [ -x "$BINARY" ]; then
+  exec "$BINARY" "$@"
 fi
 
-BINARY_PATH="$SCRIPT_DIR/$BINARY"
-
-if [ ! -f "$BINARY_PATH" ]; then
-  echo "Native binary not found: $BINARY" >&2
-  echo "Falling back to Node.js..." >&2
-  exec node "$SCRIPT_DIR/../dist/index.js" "$@"
-fi
-
-exec "$BINARY_PATH" "$@"
+# Fall back to Node.js
+exec node "$SCRIPT_DIR/../dist/index.js" "$@"

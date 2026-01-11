@@ -1,6 +1,6 @@
 @echo off
-:: Cross-platform launcher for agent-browser (Windows)
-:: Detects architecture and runs the appropriate native binary
+:: agent-browser CLI wrapper for Windows
+:: Tries native binary first, falls back to Node.js
 
 setlocal
 
@@ -23,13 +23,6 @@ if exist "%BINARY%" (
     exit /b %errorlevel%
 )
 
-:: Fallback to Node.js implementation
-set "NODE_CLI=%SCRIPT_DIR%..\dist\cli-light.js"
-if exist "%NODE_CLI%" (
-    node "%NODE_CLI%" %*
-    exit /b %errorlevel%
-)
-
-echo Error: No binary found for win32-%ARCH% >&2
-echo Run 'npm run build:native' or 'npm run build:all-platforms' to build >&2
-exit /b 1
+:: Fall back to Node.js
+node "%SCRIPT_DIR%..\dist\index.js" %*
+exit /b %errorlevel%
