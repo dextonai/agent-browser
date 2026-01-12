@@ -252,7 +252,9 @@ describe('parseCommand', () => {
     });
 
     it('should parse storage_get with specific key', () => {
-      const result = parseCommand(cmd({ id: '1', action: 'storage_get', type: 'local', key: 'mykey' }));
+      const result = parseCommand(
+        cmd({ id: '1', action: 'storage_get', type: 'local', key: 'mykey' })
+      );
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.command.key).toBe('mykey');
@@ -426,14 +428,16 @@ describe('parseCommand', () => {
     });
 
     it('should parse snapshot with all options', () => {
-      const result = parseCommand(cmd({
-        id: '1',
-        action: 'snapshot',
-        interactive: true,
-        compact: true,
-        maxDepth: 5,
-        selector: '.content',
-      }));
+      const result = parseCommand(
+        cmd({
+          id: '1',
+          action: 'snapshot',
+          interactive: true,
+          compact: true,
+          maxDepth: 5,
+          selector: '.content',
+        })
+      );
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.command.interactive).toBe(true);
@@ -487,7 +491,9 @@ describe('parseCommand', () => {
 
   describe('scroll', () => {
     it('should parse scroll command', () => {
-      const result = parseCommand(cmd({ id: '1', action: 'scroll', direction: 'down', amount: 300 }));
+      const result = parseCommand(
+        cmd({ id: '1', action: 'scroll', direction: 'down', amount: 300 })
+      );
       expect(result.success).toBe(true);
     });
 
@@ -521,7 +527,9 @@ describe('parseCommand', () => {
     });
 
     it('should parse geolocation', () => {
-      const result = parseCommand(cmd({ id: '1', action: 'geolocation', latitude: 37.7749, longitude: -122.4194 }));
+      const result = parseCommand(
+        cmd({ id: '1', action: 'geolocation', latitude: 37.7749, longitude: -122.4194 })
+      );
       expect(result.success).toBe(true);
     });
 
@@ -572,7 +580,9 @@ describe('parseCommand', () => {
     });
 
     it('should parse dialog accept with prompt text', () => {
-      const result = parseCommand(cmd({ id: '1', action: 'dialog', response: 'accept', promptText: 'hello' }));
+      const result = parseCommand(
+        cmd({ id: '1', action: 'dialog', response: 'accept', promptText: 'hello' })
+      );
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.command.promptText).toBe('hello');

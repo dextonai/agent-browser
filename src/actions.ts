@@ -383,7 +383,7 @@ async function handleNavigate(
 async function handleClick(command: ClickCommand, browser: BrowserManager): Promise<Response> {
   // Support both refs (@e1) and regular selectors
   const locator = browser.getLocator(command.selector);
-  
+
   await locator.click({
     button: command.button,
     clickCount: command.clickCount,
@@ -449,7 +449,13 @@ async function handleScreenshot(
 }
 
 async function handleSnapshot(
-  command: Command & { action: 'snapshot'; interactive?: boolean; maxDepth?: number; compact?: boolean; selector?: string },
+  command: Command & {
+    action: 'snapshot';
+    interactive?: boolean;
+    maxDepth?: number;
+    compact?: boolean;
+    selector?: string;
+  },
   browser: BrowserManager
 ): Promise<Response<SnapshotData>> {
   // Use enhanced snapshot with refs and optional filtering

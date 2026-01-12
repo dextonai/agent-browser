@@ -94,7 +94,7 @@ export class BrowserManager {
     if (!refData) return null;
 
     const page = this.getPage();
-    
+
     // Parse the selector and create locator
     if (refData.name) {
       return page.getByRole(refData.role as any, { name: refData.name });

@@ -33,7 +33,7 @@ export function getSession(): string {
 function getPortForSession(session: string): number {
   let hash = 0;
   for (let i = 0; i < session.length; i++) {
-    hash = ((hash << 5) - hash) + session.charCodeAt(i);
+    hash = (hash << 5) - hash + session.charCodeAt(i);
     hash |= 0;
   }
   // Port range 49152-65535 (dynamic/private ports)
@@ -90,7 +90,9 @@ export function isDaemonRunning(session?: string): boolean {
  * Get connection info for the current session
  * Returns { type: 'unix', path: string } or { type: 'tcp', port: number }
  */
-export function getConnectionInfo(session?: string): { type: 'unix'; path: string } | { type: 'tcp'; port: number } {
+export function getConnectionInfo(
+  session?: string
+): { type: 'unix'; path: string } | { type: 'tcp'; port: number } {
   const sess = session ?? currentSession;
   if (isWindows) {
     return { type: 'tcp', port: getPortForSession(sess) };

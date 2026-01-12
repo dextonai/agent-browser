@@ -173,10 +173,10 @@ function processAriaTree(ariaTree: string, refs: RefMap, options: SnapshotOption
     for (const line of lines) {
       const match = line.match(/^(\s*-\s*)(\w+)(?:\s+"([^"]*)")?(.*)$/);
       if (!match) continue;
-      
+
       const [, , role, name, suffix] = match;
       const roleLower = role.toLowerCase();
-      
+
       if (INTERACTIVE_ROLES.has(roleLower)) {
         const ref = nextRef();
         refs[ref] = {
@@ -184,12 +184,12 @@ function processAriaTree(ariaTree: string, refs: RefMap, options: SnapshotOption
           role: roleLower,
           name,
         };
-        
+
         let enhanced = `- ${role}`;
         if (name) enhanced += ` "${name}"`;
         enhanced += ` [ref=${ref}]`;
         if (suffix && suffix.includes('[')) enhanced += suffix;
-        
+
         result.push(enhanced);
       }
     }
@@ -223,11 +223,7 @@ function getIndentLevel(line: string): number {
 /**
  * Process a single line: add ref if needed, filter if requested
  */
-function processLine(
-  line: string,
-  refs: RefMap,
-  options: SnapshotOptions
-): string | null {
+function processLine(line: string, refs: RefMap, options: SnapshotOptions): string | null {
   const depth = getIndentLevel(line);
 
   // Check max depth
@@ -302,27 +298,27 @@ function processLine(
 function compactTree(tree: string): string {
   const lines = tree.split('\n');
   const result: string[] = [];
-  
+
   // Simple pass: keep lines that have content or refs
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Always keep lines with refs
     if (line.includes('[ref=')) {
       result.push(line);
       continue;
     }
-    
+
     // Keep lines with text content (after :)
     if (line.includes(':') && !line.endsWith(':')) {
       result.push(line);
       continue;
     }
-    
+
     // Check if this structural element has children with refs
     const currentIndent = getIndentLevel(line);
     let hasRelevantChildren = false;
-    
+
     for (let j = i + 1; j < lines.length; j++) {
       const childIndent = getIndentLevel(lines[j]);
       if (childIndent <= currentIndent) break;
@@ -331,12 +327,12 @@ function compactTree(tree: string): string {
         break;
       }
     }
-    
+
     if (hasRelevantChildren) {
       result.push(line);
     }
   }
-  
+
   return result.join('\n');
 }
 
@@ -359,17 +355,18 @@ export function parseRef(arg: string): string | null {
 /**
  * Get snapshot statistics
  */
-export function getSnapshotStats(tree: string, refs: RefMap): {
+export function getSnapshotStats(
+  tree: string,
+  refs: RefMap
+): {
   lines: number;
   chars: number;
   tokens: number;
   refs: number;
   interactive: number;
 } {
-  const interactive = Object.values(refs).filter(r => 
-    INTERACTIVE_ROLES.has(r.role)
-  ).length;
-  
+  const interactive = Object.values(refs).filter((r) => INTERACTIVE_ROLES.has(r.role)).length;
+
   return {
     lines: tree.split('\n').length,
     chars: tree.length,

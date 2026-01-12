@@ -123,7 +123,9 @@ describe('BrowserManager', () => {
     it('should set cookie with domain', async () => {
       const page = browser.getPage();
       const context = page.context();
-      await context.addCookies([{ name: 'domainCookie', value: 'domainValue', domain: 'example.com', path: '/' }]);
+      await context.addCookies([
+        { name: 'domainCookie', value: 'domainValue', domain: 'example.com', path: '/' },
+      ]);
       const cookies = await context.cookies();
       const testCookie = cookies.find((c) => c.name === 'domainCookie');
       expect(testCookie?.value).toBe('domainValue');
