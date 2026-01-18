@@ -125,6 +125,12 @@ fn run_session(args: &[String], session: &str, json_mode: bool) {
 }
 
 fn main() {
+    // Ignore SIGPIPE to prevent panic when piping to head/tail
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+
     let args: Vec<String> = env::args().skip(1).collect();
     let flags = parse_flags(&args);
     let clean = clean_args(&args);
