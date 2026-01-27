@@ -286,3 +286,18 @@ jobs:
           fi
           echo "✓ Symlink correctly points to native binary"
         shell: bash
+
+      - name: Verify shim points to native binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $shimPath = "$(npm prefix -g)\agent-browser.cmd"
+          $content = Get-Content $shimPath -Raw
+          echo "Shim path: $shimPath"
+          echo "Shim content:"
+          echo $content
+          if ($content -notmatch "agent-browser-win32-x64\.exe") {
+            echo "ERROR: Shim should point to native .exe, not JS wrapper"
+            exit 1
+          }
+          echo "✓ Shim correctly points to native binary"
+        shell: pwsh

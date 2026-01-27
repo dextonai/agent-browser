@@ -173,10 +173,11 @@ async function fixUnixSymlink() {
   try {
     unlinkSync(symlinkPath);
     symlinkSync(binaryPath, symlinkPath);
-    console.log('✓ Fixed symlink to use native binary directly');
+    console.log('✓ Optimized: symlink points to native binary (zero overhead)');
   } catch (err) {
     // Permission error or other issue - not critical, JS wrapper still works
-    // This can happen if npm bin dir requires sudo
+    console.log(`⚠ Could not optimize symlink: ${err.message}`);
+    console.log('  CLI will work via Node.js wrapper (slightly slower startup)');
   }
 }
 
@@ -206,12 +207,13 @@ async function fixWindowsShims() {
   // Path to native binary relative to npm prefix
   const relativeBinaryPath = 'node_modules\\agent-browser\\bin\\agent-browser-win32-x64.exe';
 
-  // Overwrite .cmd shim
-  const cmdContent = `@ECHO off\r\n"%~dp0${relativeBinaryPath}" %*\r\n`;
-  writeFileSync(cmdShim, cmdContent);
+  try {
+    // Overwrite .cmd shim
+    const cmdContent = `@ECHO off\r\n"%~dp0${relativeBinaryPath}" %*\r\n`;
+    writeFileSync(cmdShim, cmdContent);
 
-  // Overwrite .ps1 shim
-  const ps1Content = `#!/usr/bin/env pwsh
+    // Overwrite .ps1 shim
+    const ps1Content = `#!/usr/bin/env pwsh
 $basedir = Split-Path $MyInvocation.MyCommand.Definition -Parent
 $exe = ""
 if ($PSVersionTable.PSVersion -lt "6.0" -or $IsWindows) {
@@ -220,9 +222,14 @@ if ($PSVersionTable.PSVersion -lt "6.0" -or $IsWindows) {
 & "$basedir/${relativeBinaryPath.replace(/\\/g, '/')}" $args
 exit $LASTEXITCODE
 `;
-  writeFileSync(ps1Shim, ps1Content);
+    writeFileSync(ps1Shim, ps1Content);
 
-  console.log('✓ Fixed Windows command shims for native binary');
+    console.log('✓ Optimized: shims point to native binary (zero overhead)');
+  } catch (err) {
+    // Permission error or other issue - not critical, JS wrapper still works
+    console.log(`⚠ Could not optimize shims: ${err.message}`);
+    console.log('  CLI will work via Node.js wrapper (slightly slower startup)');
+  }
 }
 
 main().catch(console.error);
