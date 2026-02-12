@@ -191,6 +191,43 @@ export class BrowserManager {
   }
 
   /**
+   * Check if the browser has any usable pages
+   */
+  hasPages(): boolean {
+    return this.pages.length > 0;
+  }
+
+  /**
+   * Ensure at least one page exists. If the browser is launched but all pages
+   * were closed (stale session), creates a new page on the existing context.
+   * No-op if pages already exist.
+   */
+  async ensurePage(): Promise<void> {
+    if (this.pages.length > 0) return;
+    if (!this.browser && !this.isPersistentContext) return;
+
+    // Use the last existing context, or create a new one
+    let context: BrowserContext;
+    if (this.contexts.length > 0) {
+      context = this.contexts[this.contexts.length - 1];
+    } else if (this.browser) {
+      context = await this.browser.newContext();
+      context.setDefaultTimeout(60000);
+      this.contexts.push(context);
+      this.setupContextTracking(context);
+    } else {
+      return;
+    }
+
+    const page = await context.newPage();
+    if (!this.pages.includes(page)) {
+      this.pages.push(page);
+      this.setupPageTracking(page);
+    }
+    this.activePageIndex = this.pages.length - 1;
+  }
+
+  /**
    * Get the current active page, throws if not launched
    */
   getPage(): Page {

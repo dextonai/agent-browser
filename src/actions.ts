@@ -651,7 +651,7 @@ async function handleScroll(command: ScrollCommand, browser: BrowserManager): Pr
   const page = browser.getPage();
 
   if (command.selector) {
-    const element = page.locator(command.selector);
+    const element = browser.getLocator(command.selector);
     await element.scrollIntoViewIfNeeded();
 
     if (command.x !== undefined || command.y !== undefined) {
@@ -1843,8 +1843,7 @@ async function handleScrollIntoView(
   command: ScrollIntoViewCommand,
   browser: BrowserManager
 ): Promise<Response> {
-  const page = browser.getPage();
-  await page.locator(command.selector).scrollIntoViewIfNeeded();
+  await browser.getLocator(command.selector).scrollIntoViewIfNeeded();
   return successResponse(command.id, { scrolled: true });
 }
 

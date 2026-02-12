@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { BrowserManager } from './browser.js';
+import { executeCommand } from './actions.js';
 import { chromium } from 'playwright-core';
 
 describe('BrowserManager', () => {
@@ -51,6 +52,192 @@ describe('BrowserManager', () => {
 
       expect(newBrowser.getBrowser()).toBeNull();
       await newBrowser.close();
+    });
+  });
+
+  describe('stale session recovery (all pages closed)', () => {
+    it('should recover when all pages are closed externally', async () => {
+      const testBrowser = new BrowserManager();
+      await testBrowser.launch({ headless: true });
+
+      // Verify initial state
+      expect(testBrowser.isLaunched()).toBe(true);
+      expect(testBrowser.getPage()).toBeDefined();
+
+      // Close all pages externally (simulates stale daemon state)
+      const pages = testBrowser.getPages();
+      for (const page of [...pages]) {
+        await page.close();
+      }
+
+      // Wait for close events to propagate
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // isLaunched() is true but pages array is empty -- this is the stale state
+      expect(testBrowser.isLaunched()).toBe(true);
+      expect(testBrowser.getPages().length).toBe(0);
+
+      // ensurePage() should recover by creating a new page
+      await testBrowser.ensurePage();
+      expect(testBrowser.getPages().length).toBe(1);
+      expect(testBrowser.getPage()).toBeDefined();
+
+      await testBrowser.close();
+    });
+
+    it('should be a no-op when pages already exist', async () => {
+      const testBrowser = new BrowserManager();
+      await testBrowser.launch({ headless: true });
+
+      const pageBefore = testBrowser.getPage();
+      await testBrowser.ensurePage();
+      const pageAfter = testBrowser.getPage();
+
+      // Should be the same page -- no-op
+      expect(pageAfter).toBe(pageBefore);
+      expect(testBrowser.getPages().length).toBe(1);
+
+      await testBrowser.close();
+    });
+  });
+
+  describe('scrollintoview with refs', () => {
+    it('should resolve refs in scrollintoview command', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body style="height: 3000px;">
+            <div style="height: 2000px;"></div>
+            <button id="far-button">Far Away Button</button>
+          </body>
+        </html>
+      `);
+
+      // Get snapshot to populate refs
+      const { refs } = await browser.getSnapshot({ interactive: true });
+
+      // Find the ref for our button
+      const buttonRef = Object.keys(refs).find((k) => refs[k].name === 'Far Away Button');
+      expect(buttonRef).toBeDefined();
+
+      // scrollintoview with a ref should work, not throw a CSS selector error
+      const result = await executeCommand(
+        { id: 'test-1', action: 'scrollintoview', selector: `@${buttonRef}` },
+        browser
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('should resolve refs in scroll command with selector', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body style="height: 3000px;">
+            <div id="scroll-container" style="height: 200px; overflow: auto;">
+              <div style="height: 1000px;">Scrollable content</div>
+            </div>
+            <button id="target-btn">Target Button</button>
+          </body>
+        </html>
+      `);
+
+      const { refs } = await browser.getSnapshot({ interactive: true });
+      const buttonRef = Object.keys(refs).find((k) => refs[k].name === 'Target Button');
+      expect(buttonRef).toBeDefined();
+
+      // scroll with a ref selector should work
+      const result = await executeCommand(
+        { id: 'test-2', action: 'scroll', selector: `@${buttonRef}`, y: 100 },
+        browser
+      );
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('cursor-ref selector uniqueness', () => {
+    it('should produce unique selectors for repeated DOM structures', async () => {
+      const page = browser.getPage();
+      // Build deeply nested identical structures where the distinguishing
+      // ancestor (div.branch) is at level 4 from the target element --
+      // beyond the previous 3-level path cutoff.
+      await page.setContent(`
+        <html>
+          <body>
+            <div class="root">
+              <div class="branch">
+                <div class="level1">
+                  <div class="level2">
+                    <div class="target" style="cursor: pointer; width: 100px; height: 30px;" onclick="void(0)">Item Alpha</div>
+                  </div>
+                </div>
+              </div>
+              <div class="branch">
+                <div class="level1">
+                  <div class="level2">
+                    <div class="target" style="cursor: pointer; width: 100px; height: 30px;" onclick="void(0)">Item Beta</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+
+      const { refs } = await browser.getSnapshot({ interactive: true, cursor: true });
+
+      // Find the cursor-interactive refs
+      const cursorRefs = Object.entries(refs).filter(([, r]) => r.role === 'clickable');
+      expect(cursorRefs.length).toBe(2);
+
+      // Each ref's selector must be unique -- clicking it should not
+      // trigger a strict mode violation.
+      for (const [refKey] of cursorRefs) {
+        const locator = browser.getLocator(`@${refKey}`);
+        const count = await locator.count();
+        expect(count).toBe(1);
+      }
+    });
+
+    it('should click the correct element when refs have repeated structure', async () => {
+      const page = browser.getPage();
+      await page.setContent(`
+        <html>
+          <body>
+            <div class="root">
+              <div class="branch">
+                <div class="level1">
+                  <div class="level2">
+                    <div class="target" style="cursor: pointer; width: 100px; height: 30px;"
+                         onclick="document.getElementById('result').textContent = 'alpha'">Item Alpha</div>
+                  </div>
+                </div>
+              </div>
+              <div class="branch">
+                <div class="level1">
+                  <div class="level2">
+                    <div class="target" style="cursor: pointer; width: 100px; height: 30px;"
+                         onclick="document.getElementById('result').textContent = 'beta'">Item Beta</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="result">none</div>
+          </body>
+        </html>
+      `);
+
+      const { refs } = await browser.getSnapshot({ interactive: true, cursor: true });
+
+      // Find the ref for "Item Beta"
+      const betaRef = Object.keys(refs).find((k) => refs[k].name === 'Item Beta');
+      expect(betaRef).toBeDefined();
+
+      // Click it -- should not throw strict mode violation
+      const locator = browser.getLocator(`@${betaRef}`);
+      await locator.click();
+
+      const result = await page.locator('#result').textContent();
+      expect(result).toBe('beta');
     });
   });
 

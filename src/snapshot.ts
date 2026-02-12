@@ -204,7 +204,16 @@ async function findCursorInteractiveElements(
         }
         path.unshift(sel);
         current = current.parentElement;
-        if (path.length >= 3) break;
+        // Stop once the selector uniquely identifies the element (max 10 levels)
+        if (path.length >= 1) {
+          try {
+            const candidate = path.join(' > ');
+            if (document.querySelectorAll(candidate).length === 1) break;
+          } catch (e) {
+            // If selector is invalid, keep building
+          }
+        }
+        if (path.length >= 10) break;
       }
       return path.join(' > ');
     };

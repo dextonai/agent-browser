@@ -329,6 +329,17 @@ export async function startDaemon(options?: {
             }
           }
 
+          // Recover from stale state: browser is launched but all pages were closed
+          if (
+            manager instanceof BrowserManager &&
+            manager.isLaunched() &&
+            !manager.hasPages() &&
+            parseResult.command.action !== 'launch' &&
+            parseResult.command.action !== 'close'
+          ) {
+            await manager.ensurePage();
+          }
+
           // Handle close command specially - shuts down daemon
           if (parseResult.command.action === 'close') {
             const response =
