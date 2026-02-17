@@ -470,7 +470,7 @@ fn main() {
             if flags.json {
                 println!(r#"{{"success":false,"error":"{}"}}"#, msg);
             } else {
-                eprintln!("\x1b[31m✗\x1b[0m {}", msg);
+                eprintln!("{} {}", color::error_indicator(), msg);
             }
             exit(1);
         }

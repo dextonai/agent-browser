@@ -344,6 +344,11 @@ pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>) {
                 return;
             }
         }
+        // Trace stop without path
+        if data.get("traceStopped").is_some() {
+            println!("{} Trace stopped", color::success_indicator());
+            return;
+        }
         // Path-based operations (screenshot/pdf/trace/har/download/state/video)
         if let Some(path) = data.get("path").and_then(|v| v.as_str()) {
             match action.unwrap_or("") {

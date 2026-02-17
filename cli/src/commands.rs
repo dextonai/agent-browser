@@ -345,10 +345,8 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
 
             // Default: selector or timeout
             if let Some(arg) = rest.first() {
-                if arg.parse::<u64>().is_ok() {
-                    Ok(
-                        json!({ "id": id, "action": "wait", "timeout": arg.parse::<u64>().unwrap() }),
-                    )
+                if let Ok(timeout) = arg.parse::<u64>() {
+                    Ok(json!({ "id": id, "action": "wait", "timeout": timeout }))
                 } else {
                     Ok(json!({ "id": id, "action": "wait", "selector": arg }))
                 }
@@ -684,7 +682,8 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
                 Ok(cmd)
             }
             Some(n) if n.parse::<i32>().is_ok() => {
-                Ok(json!({ "id": id, "action": "tab_switch", "index": n.parse::<i32>().unwrap() }))
+                let index = n.parse::<i32>().expect("already checked parse succeeds");
+                Ok(json!({ "id": id, "action": "tab_switch", "index": index }))
             }
             _ => Ok(json!({ "id": id, "action": "tab_list" })),
         },
@@ -746,11 +745,11 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
             match rest.first().copied() {
                 Some("start") => Ok(json!({ "id": id, "action": "trace_start" })),
                 Some("stop") => {
-                    let path = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
-                        context: "trace stop".to_string(),
-                        usage: "trace stop <path>",
-                    })?;
-                    Ok(json!({ "id": id, "action": "trace_stop", "path": path }))
+                    let mut cmd = json!({ "id": id, "action": "trace_stop" });
+                    if let Some(path) = rest.get(1) {
+                        cmd["path"] = json!(path);
+                    }
+                    Ok(cmd)
                 }
                 Some(sub) => Err(ParseError::UnknownSubcommand {
                     subcommand: sub.to_string(),
@@ -2571,5 +2570,27 @@ mod tests {
         let cmd = parse_command(&args("connect 1"), &default_flags()).unwrap();
         assert_eq!(cmd["action"], "launch");
         assert_eq!(cmd["cdpPort"], 1);
+    }
+
+    // === Trace Tests ===
+
+    #[test]
+    fn test_trace_start() {
+        let cmd = parse_command(&args("trace start"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "trace_start");
+    }
+
+    #[test]
+    fn test_trace_stop_with_path() {
+        let cmd = parse_command(&args("trace stop ./trace.zip"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "trace_stop");
+        assert_eq!(cmd["path"], "./trace.zip");
+    }
+
+    #[test]
+    fn test_trace_stop_without_path() {
+        let cmd = parse_command(&args("trace stop"), &default_flags()).unwrap();
+        assert_eq!(cmd["action"], "trace_stop");
+        assert!(cmd.get("path").is_none() || cmd["path"].is_null());
     }
 }
