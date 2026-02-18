@@ -1884,7 +1884,7 @@ Options:
 
 Configuration:
   agent-browser looks for agent-browser.json in these locations (lowest to highest priority):
-    1. ~/.config/agent-browser.json      User-level defaults
+    1. ~/.agent-browser/config.json      User-level defaults
     2. ./agent-browser.json              Project-level overrides
     3. Environment variables             Override config file values
     4. CLI flags                         Override everything

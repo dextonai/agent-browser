@@ -10,7 +10,7 @@ agent-browser checks two locations, merged in priority order:
 
 | Priority | Location | Scope |
 |----------|----------|-------|
-| 1 (lowest) | `~/.config/agent-browser.json` | User-level defaults |
+| 1 (lowest) | `~/.agent-browser/config.json` | User-level defaults |
 | 2 | `./agent-browser.json` | Project-level overrides |
 | 3 | `AGENT_BROWSER_*` env vars | Override config values |
 | 4 (highest) | CLI flags | Override everything |
@@ -43,6 +43,7 @@ Every CLI flag can be set in the config file using its camelCase equivalent:
 |------------|----------|------|
 | `headed` | `--headed` | boolean |
 | `json` | `--json` | boolean |
+| `full` | `--full, -f` | boolean |
 | `debug` | `--debug` | boolean |
 | `session` | `--session` | string |
 | `sessionName` | `--session-name` | string |
@@ -120,13 +121,15 @@ This applies to all boolean flags: `--headed`, `--debug`, `--json`, `--ignore-ht
 
 ## Extensions Merging
 
-Extensions from user-level and project-level configs are **concatenated**, not replaced. For example, if `~/.config/agent-browser.json` specifies `["/ext1"]` and `./agent-browser.json` specifies `["/ext2"]`, the result is `["/ext1", "/ext2"]`.
+Extensions from user-level and project-level configs are **concatenated**, not replaced. For example, if `~/.agent-browser/config.json` specifies `["/ext1"]` and `./agent-browser.json` specifies `["/ext2"]`, the result is `["/ext1", "/ext2"]`.
 
 The `AGENT_BROWSER_EXTENSIONS` environment variable and CLI `--extension` flags follow the standard priority rules (env replaces config, CLI appends).
 
 ## Error Handling
 
-- **Auto-discovered config files** (`~/.config/agent-browser.json`, `./agent-browser.json`) that are missing are silently ignored.
+- **Auto-discovered config files** (`~/.agent-browser/config.json`, `./agent-browser.json`) that are missing are silently ignored.
 - **`--config <path>`** with a missing or malformed file exits with an error.
 - **Malformed JSON** in auto-discovered files prints a warning to stderr and continues without that file.
 - **Unknown keys** are silently ignored for forward compatibility.
+
+> **Tip:** If your project-level `agent-browser.json` contains environment-specific values (paths, proxies), consider adding it to `.gitignore`.

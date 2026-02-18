@@ -4,13 +4,16 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const CONFIG_FILENAME: &str = "agent-browser.json";
+const CONFIG_DIR: &str = ".agent-browser";
+const CONFIG_FILENAME: &str = "config.json";
+const PROJECT_CONFIG_FILENAME: &str = "agent-browser.json";
 
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub headed: Option<bool>,
     pub json: Option<bool>,
+    pub full: Option<bool>,
     pub debug: Option<bool>,
     pub session: Option<String>,
     pub session_name: Option<String>,
@@ -36,6 +39,7 @@ impl Config {
         Config {
             headed: other.headed.or(self.headed),
             json: other.json.or(self.json),
+            full: other.full.or(self.full),
             debug: other.debug.or(self.debug),
             session: other.session.or(self.session),
             session_name: other.session_name.or(self.session_name),
@@ -70,7 +74,8 @@ fn read_config_file(path: &Path) -> Option<Config> {
         Ok(config) => Some(config),
         Err(e) => {
             eprintln!(
-                "Warning: invalid config file {}: {}",
+                "{} invalid config file {}: {}",
+                color::warning_indicator(),
                 path.display(),
                 e
             );
@@ -80,7 +85,7 @@ fn read_config_file(path: &Path) -> Option<Config> {
 }
 
 /// Parse an optional boolean value after a flag. Returns (value, consumed_next_arg).
-/// Recognizes "true"/"1" as true, "false"/"0" as false. Bare flag defaults to true.
+/// Recognizes "true" as true, "false" as false. Bare flag defaults to true.
 fn parse_bool_arg(args: &[String], i: usize) -> (bool, bool) {
     if let Some(v) = args.get(i + 1) {
         match v.as_str() {
@@ -93,12 +98,14 @@ fn parse_bool_arg(args: &[String], i: usize) -> (bool, bool) {
     }
 }
 
-/// Extract --config <path> from args before full flag parsing
-fn extract_config_path(args: &[String]) -> Option<String> {
+/// Extract --config <path> from args before full flag parsing.
+/// Returns `Some(Some(path))` if --config <path> found, `Some(None)` if --config
+/// was the last arg with no value, `None` if --config not present.
+fn extract_config_path(args: &[String]) -> Option<Option<String>> {
     let mut i = 0;
     while i < args.len() {
         if args[i] == "--config" {
-            return args.get(i + 1).cloned();
+            return Some(args.get(i + 1).cloned());
         }
         i += 1;
     }
@@ -106,7 +113,14 @@ fn extract_config_path(args: &[String]) -> Option<String> {
 }
 
 pub fn load_config(args: &[String]) -> Config {
-    if let Some(path_str) = extract_config_path(args) {
+    if let Some(maybe_path) = extract_config_path(args) {
+        let Some(path_str) = maybe_path else {
+            eprintln!(
+                "{} --config requires a file path",
+                color::warning_indicator(),
+            );
+            std::process::exit(1);
+        };
         let path = PathBuf::from(&path_str);
         if !path.exists() {
             eprintln!(
@@ -123,11 +137,11 @@ pub fn load_config(args: &[String]) -> Config {
     }
 
     let user_config = dirs::home_dir()
-        .map(|d| d.join(".config").join(CONFIG_FILENAME))
+        .map(|d| d.join(CONFIG_DIR).join(CONFIG_FILENAME))
         .and_then(|p| read_config_file(&p))
         .unwrap_or_default();
 
-    let project_config = read_config_file(&PathBuf::from(CONFIG_FILENAME));
+    let project_config = read_config_file(&PathBuf::from(PROJECT_CONFIG_FILENAME));
 
     match project_config {
         Some(project) => user_config.merge(project),
@@ -192,7 +206,7 @@ pub fn parse_flags(args: &[String]) -> Flags {
 
     let mut flags = Flags {
         json: config.json.unwrap_or(false),
-        full: false,
+        full: config.full.unwrap_or(false),
         headed: config.headed.unwrap_or(false),
         debug: config.debug.unwrap_or(false),
         session: env::var("AGENT_BROWSER_SESSION").ok()
@@ -245,7 +259,11 @@ pub fn parse_flags(args: &[String]) -> Flags {
                 flags.json = val;
                 if consumed { i += 1; }
             }
-            "--full" | "-f" => flags.full = true,
+            "--full" | "-f" => {
+                let (val, consumed) = parse_bool_arg(args, i);
+                flags.full = val;
+                if consumed { i += 1; }
+            }
             "--headed" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.headed = val;
@@ -379,10 +397,10 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
     let mut result = Vec::new();
     let mut skip_next = false;
 
-    const GLOBAL_FLAGS: &[&str] = &["--full"];
-    // Boolean flags that optionally take true/false/1/0
+    // Boolean flags that optionally take true/false
     const GLOBAL_BOOL_FLAGS: &[&str] = &[
         "--json",
+        "--full",
         "--headed",
         "--debug",
         "--ignore-https-errors",
@@ -422,16 +440,12 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
             i += 1;
             continue;
         }
-        if GLOBAL_BOOL_FLAGS.contains(&arg.as_str()) {
+        if GLOBAL_BOOL_FLAGS.contains(&arg.as_str()) || arg == "-f" {
             if let Some(v) = args.get(i + 1) {
                 if matches!(v.as_str(), "true" | "false") {
                     i += 1;
                 }
             }
-            i += 1;
-            continue;
-        }
-        if GLOBAL_FLAGS.contains(&arg.as_str()) || arg == "-f" {
             i += 1;
             continue;
         }
@@ -606,6 +620,7 @@ mod tests {
         let json = r#"{
             "headed": true,
             "json": true,
+            "full": true,
             "debug": true,
             "session": "test-session",
             "sessionName": "my-app",
@@ -628,6 +643,7 @@ mod tests {
         let config: Config = serde_json::from_str(json).unwrap();
         assert_eq!(config.headed, Some(true));
         assert_eq!(config.json, Some(true));
+        assert_eq!(config.full, Some(true));
         assert_eq!(config.debug, Some(true));
         assert_eq!(config.session.as_deref(), Some("test-session"));
         assert_eq!(config.session_name.as_deref(), Some("my-app"));
@@ -750,7 +766,7 @@ mod tests {
     fn test_extract_config_path() {
         assert_eq!(
             extract_config_path(&args("--config ./my-config.json open example.com")),
-            Some("./my-config.json".to_string())
+            Some(Some("./my-config.json".to_string()))
         );
     }
 
@@ -761,7 +777,7 @@ mod tests {
 
     #[test]
     fn test_extract_config_path_no_value() {
-        assert_eq!(extract_config_path(&args("--config")), None);
+        assert_eq!(extract_config_path(&args("--config")), Some(None));
     }
 
     #[test]
@@ -842,6 +858,36 @@ mod tests {
     fn test_auto_connect_false() {
         let flags = parse_flags(&args("--auto-connect false open"));
         assert!(!flags.auto_connect);
+    }
+
+    #[test]
+    fn test_full_bare_defaults_true() {
+        let flags = parse_flags(&args("--full open example.com"));
+        assert!(flags.full);
+    }
+
+    #[test]
+    fn test_full_false() {
+        let flags = parse_flags(&args("--full false open example.com"));
+        assert!(!flags.full);
+    }
+
+    #[test]
+    fn test_full_short_flag() {
+        let flags = parse_flags(&args("-f open example.com"));
+        assert!(flags.full);
+    }
+
+    #[test]
+    fn test_clean_args_removes_full_with_value() {
+        let cleaned = clean_args(&args("--full false open example.com"));
+        assert_eq!(cleaned, vec!["open", "example.com"]);
+    }
+
+    #[test]
+    fn test_clean_args_removes_short_full() {
+        let cleaned = clean_args(&args("-f open example.com"));
+        assert_eq!(cleaned, vec!["open", "example.com"]);
     }
 
     #[test]
