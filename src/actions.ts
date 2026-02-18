@@ -638,34 +638,34 @@ async function handleScreenshot(
       const { refs } = await browser.getSnapshot({ interactive: true });
 
       const entries = Object.entries(refs);
-      const boxResults = await Promise.allSettled(
-        entries.map(async ([ref, data]) => {
-          const locator = browser.getLocatorFromRef(ref);
-          if (!locator) return null;
-          const box = await locator.boundingBox();
-          if (!box || box.width === 0 || box.height === 0) return null;
-          const num = parseInt(ref.replace('e', ''), 10);
-          return {
-            ref,
-            number: num,
-            role: data.role,
-            name: data.name,
-            box: {
-              x: Math.round(box.x),
-              y: Math.round(box.y),
-              width: Math.round(box.width),
-              height: Math.round(box.height),
-            },
-          } satisfies Annotation;
+      const results = await Promise.all(
+        entries.map(async ([ref, data]): Promise<Annotation | null> => {
+          try {
+            const locator = browser.getLocatorFromRef(ref);
+            if (!locator) return null;
+            const box = await locator.boundingBox();
+            if (!box || box.width === 0 || box.height === 0) return null;
+            const num = parseInt(ref.replace('e', ''), 10);
+            return {
+              ref,
+              number: num,
+              role: data.role,
+              name: data.name,
+              box: {
+                x: Math.round(box.x),
+                y: Math.round(box.y),
+                width: Math.round(box.width),
+                height: Math.round(box.height),
+              },
+            };
+          } catch {
+            return null;
+          }
         })
       );
 
-      annotations = boxResults
-        .filter(
-          (r): r is PromiseFulfilledResult<Annotation> =>
-            r.status === 'fulfilled' && r.value !== null
-        )
-        .map((r) => r.value)
+      annotations = results
+        .filter((a): a is Annotation => a !== null)
         .sort((a, b) => a.number - b.number);
 
       if (annotations.length > 0) {
@@ -677,30 +677,25 @@ async function handleScreenshot(
           height: a.box.height,
         }));
 
-        await page.evaluate((items: typeof overlayData) => {
-          const container = document.createElement('div');
-          container.id = '__agent_browser_annotations__';
-          container.style.cssText =
-            'position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483647;';
-
-          const scrollX = window.scrollX;
-          const scrollY = window.scrollY;
-
-          for (const item of items) {
-            const box = document.createElement('div');
-            box.style.cssText = `position:absolute;left:${item.x + scrollX}px;top:${item.y + scrollY}px;width:${item.width}px;height:${item.height}px;border:2px solid rgba(255,0,0,0.8);box-sizing:border-box;pointer-events:none;`;
-
-            const label = document.createElement('div');
-            label.textContent = String(item.number);
-            label.style.cssText =
-              'position:absolute;top:-14px;left:-2px;background:rgba(255,0,0,0.9);color:#fff;font:bold 11px/14px monospace;padding:0 4px;border-radius:2px;white-space:nowrap;';
-
-            box.appendChild(label);
-            container.appendChild(box);
-          }
-
-          document.documentElement.appendChild(container);
-        }, overlayData);
+        await page.evaluate(
+          `(function(items) {
+            var c = document.createElement('div');
+            c.id = '__agent_browser_annotations__';
+            c.style.cssText = 'position:absolute;top:0;left:0;width:0;height:0;pointer-events:none;z-index:2147483647;';
+            var sx = window.scrollX, sy = window.scrollY;
+            for (var i = 0; i < items.length; i++) {
+              var it = items[i];
+              var b = document.createElement('div');
+              b.style.cssText = 'position:absolute;left:' + (it.x + sx) + 'px;top:' + (it.y + sy) + 'px;width:' + it.width + 'px;height:' + it.height + 'px;border:2px solid rgba(255,0,0,0.8);box-sizing:border-box;pointer-events:none;';
+              var l = document.createElement('div');
+              l.textContent = String(it.number);
+              l.style.cssText = 'position:absolute;top:-14px;left:-2px;background:rgba(255,0,0,0.9);color:#fff;font:bold 11px/14px monospace;padding:0 4px;border-radius:2px;white-space:nowrap;';
+              b.appendChild(l);
+              c.appendChild(b);
+            }
+            document.documentElement.appendChild(c);
+          })(${JSON.stringify(overlayData)})`
+        );
       }
     }
 
@@ -708,10 +703,9 @@ async function handleScreenshot(
 
     if (command.annotate) {
       await page
-        .evaluate(() => {
-          const el = document.getElementById('__agent_browser_annotations__');
-          if (el) el.remove();
-        })
+        .evaluate(
+          `(function() { var el = document.getElementById('__agent_browser_annotations__'); if (el) el.remove(); })()`
+        )
         .catch(() => {});
     }
 
@@ -723,10 +717,9 @@ async function handleScreenshot(
     // Clean up overlays on error
     if (command.annotate) {
       await page
-        .evaluate(() => {
-          const el = document.getElementById('__agent_browser_annotations__');
-          if (el) el.remove();
-        })
+        .evaluate(
+          `(function() { var el = document.getElementById('__agent_browser_annotations__'); if (el) el.remove(); })()`
+        )
         .catch(() => {});
     }
     if (command.selector) {
