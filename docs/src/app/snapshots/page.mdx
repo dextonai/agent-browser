@@ -18,13 +18,18 @@ agent-browser snapshot -s "#main"         # Scope to CSS selector
 agent-browser snapshot -i -c -d 5         # Combine options
 ```
 
-| Option | Description |
-| --- | --- |
-| `-i, --interactive` | Only interactive elements (buttons, links, inputs) |
-| `-C, --cursor` | Include cursor-interactive elements (cursor:pointer, onclick, tabindex) |
-| `-c, --compact` | Remove empty structural elements |
-| `-d, --depth` | Limit tree depth |
-| `-s, --selector` | Scope to CSS selector |
+<table>
+  <thead>
+    <tr><th>Option</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>-i, --interactive</code></td><td>Only interactive elements (buttons, links, inputs)</td></tr>
+    <tr><td><code>-C, --cursor</code></td><td>Include cursor-interactive elements (cursor:pointer, onclick, tabindex)</td></tr>
+    <tr><td><code>-c, --compact</code></td><td>Remove empty structural elements</td></tr>
+    <tr><td><code>-d, --depth</code></td><td>Limit tree depth</td></tr>
+    <tr><td><code>-s, --selector</code></td><td>Scope to CSS selector</td></tr>
+  </tbody>
+</table>
 
 ## Cursor-interactive elements
 
