@@ -1920,6 +1920,9 @@ URL Diff:
     --screenshot             Also compare screenshots (default: snapshot only)
     --full                   Full page screenshots
     --wait-until <strategy>  Navigation wait strategy: load, domcontentloaded, networkidle (default: load)
+    -s, --selector <sel>     Scope snapshots to a CSS selector or @ref
+    -c, --compact            Use compact snapshot format
+    -d, --depth <n>          Limit snapshot tree depth
 
 Global Options:
   --json               Output as JSON

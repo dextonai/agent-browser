@@ -148,6 +148,7 @@ import type {
 } from './types.js';
 import { successResponse, errorResponse } from './protocol.js';
 import { diffSnapshots, diffScreenshots } from './diff.js';
+import { getEnhancedSnapshot } from './snapshot.js';
 
 // Callback for screencast frames - will be set by the daemon when streaming is active
 let screencastFrameCallback: ((frame: ScreencastFrame) => void) | null = null;
@@ -2502,7 +2503,8 @@ async function handleDiffSnapshot(
     }
   }
 
-  const { tree } = await browser.getSnapshot({
+  const page = browser.getPage();
+  const { tree } = await getEnhancedSnapshot(page, {
     selector: command.selector,
     compact: command.compact,
     maxDepth: command.maxDepth,
@@ -2547,10 +2549,15 @@ async function handleDiffUrl(command: DiffUrlCommand, browser: BrowserManager): 
   const page = browser.getPage();
 
   const waitUntil = command.waitUntil ?? 'load';
+  const snapshotOpts = {
+    selector: command.selector,
+    compact: command.compact,
+    maxDepth: command.maxDepth,
+  };
 
   // Capture state of url1
   await page.goto(command.url1, { waitUntil });
-  const { tree: tree1 } = await browser.getSnapshot();
+  const { tree: tree1 } = await getEnhancedSnapshot(page, snapshotOpts);
   const snapshot1 = tree1 || 'Empty page';
   let screenshot1: Buffer | undefined;
   if (command.screenshot) {
@@ -2559,7 +2566,7 @@ async function handleDiffUrl(command: DiffUrlCommand, browser: BrowserManager): 
 
   // Capture state of url2
   await page.goto(command.url2, { waitUntil });
-  const { tree: tree2 } = await browser.getSnapshot();
+  const { tree: tree2 } = await getEnhancedSnapshot(page, snapshotOpts);
   const snapshot2 = tree2 || 'Empty page';
 
   const snapshotDiff = diffSnapshots(snapshot1, snapshot2);

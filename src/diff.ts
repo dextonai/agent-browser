@@ -171,7 +171,8 @@ const DIFF_ROUTE_PREFIX = 'https://agent-browser-diff.internal';
 
 /**
  * Compare two image buffers using the browser's Canvas API for pixel comparison.
- * Images are served via intercepted page routes to avoid sending large base64 payloads
+ * Uses an isolated blank page to avoid CSP interference or DOM side effects on the
+ * user's page. Images are served via intercepted routes to avoid large base64 payloads
  * through page.evaluate (which can be slow or hit CDP message size limits).
  */
 export async function diffScreenshots(
@@ -183,18 +184,25 @@ export async function diffScreenshots(
   const baselineMime = opts.baselineMime ?? 'image/png';
   const threshold = opts.threshold ?? 0.1;
 
-  const baselineUrl = `${DIFF_ROUTE_PREFIX}/baseline.png`;
-  const currentUrl = `${DIFF_ROUTE_PREFIX}/current.png`;
+  const nonce = Math.random().toString(36).slice(2, 10);
+  const baselineUrl = `${DIFF_ROUTE_PREFIX}/${nonce}/baseline.png`;
+  const currentUrl = `${DIFF_ROUTE_PREFIX}/${nonce}/current.png`;
 
-  // Serve image buffers via intercepted routes instead of inlining base64 in evaluate
-  await page.route(baselineUrl, (route) =>
-    route.fulfill({ body: baselineBuffer, contentType: baselineMime })
-  );
-  await page.route(currentUrl, (route) =>
-    route.fulfill({ body: currentBuffer, contentType: 'image/png' })
-  );
+  const context = page.context();
+  const diffPage = await context.newPage();
 
+  let baselineRouted = false;
+  let currentRouted = false;
   try {
+    await diffPage.route(baselineUrl, (route) =>
+      route.fulfill({ body: baselineBuffer, contentType: baselineMime })
+    );
+    baselineRouted = true;
+    await diffPage.route(currentUrl, (route) =>
+      route.fulfill({ body: currentBuffer, contentType: 'image/png' })
+    );
+    currentRouted = true;
+
     const pixelDiffFn = async (args: {
       baselineUrl: string;
       currentUrl: string;
@@ -286,7 +294,7 @@ export async function diffScreenshots(
       };
     };
 
-    const result = (await page.evaluate(pixelDiffFn, {
+    const result = (await diffPage.evaluate(pixelDiffFn, {
       baselineUrl,
       currentUrl,
       threshold,
@@ -316,7 +324,8 @@ export async function diffScreenshots(
       ...(result.dimensionMismatch ? { dimensionMismatch: true } : {}),
     };
   } finally {
-    await page.unroute(baselineUrl);
-    await page.unroute(currentUrl);
+    if (baselineRouted) await diffPage.unroute(baselineUrl).catch(() => {});
+    if (currentRouted) await diffPage.unroute(currentUrl).catch(() => {});
+    await diffPage.close().catch(() => {});
   }
 }

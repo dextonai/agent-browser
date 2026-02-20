@@ -1082,9 +1082,17 @@ fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseErro
                     }
                     "-d" | "--depth" => {
                         if let Some(d) = rest.get(i + 1) {
-                            if let Ok(n) = d.parse::<i32>() {
-                                obj.insert("maxDepth".to_string(), json!(n));
-                                i += 1;
+                            match d.parse::<i32>() {
+                                Ok(n) => {
+                                    obj.insert("maxDepth".to_string(), json!(n));
+                                    i += 1;
+                                }
+                                Err(_) => {
+                                    return Err(ParseError::InvalidValue {
+                                        message: format!("Invalid depth value: {}", d),
+                                        usage: "diff snapshot --depth <n>",
+                                    });
+                                }
                             }
                         } else {
                             return Err(ParseError::MissingArguments {
@@ -1140,9 +1148,17 @@ fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseErro
                     }
                     "-t" | "--threshold" => {
                         if let Some(t) = rest.get(i + 1) {
-                            if let Ok(n) = t.parse::<f64>() {
-                                obj.insert("threshold".to_string(), json!(n));
-                                i += 1;
+                            match t.parse::<f64>() {
+                                Ok(n) => {
+                                    obj.insert("threshold".to_string(), json!(n));
+                                    i += 1;
+                                }
+                                Err(_) => {
+                                    return Err(ParseError::InvalidValue {
+                                        message: format!("Invalid threshold value: {}", t),
+                                        usage: "diff screenshot --threshold <0-1>",
+                                    });
+                                }
                             }
                         } else {
                             return Err(ParseError::MissingArguments {
@@ -1227,16 +1243,51 @@ fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseErro
                             });
                         }
                     }
+                    "-s" | "--selector" => {
+                        if let Some(s) = rest.get(i + 1) {
+                            obj.insert("selector".to_string(), json!(s));
+                            i += 1;
+                        } else {
+                            return Err(ParseError::MissingArguments {
+                                context: "diff url --selector".to_string(),
+                                usage: "diff url <url1> <url2> --selector <sel>",
+                            });
+                        }
+                    }
+                    "-c" | "--compact" => {
+                        obj.insert("compact".to_string(), json!(true));
+                    }
+                    "-d" | "--depth" => {
+                        if let Some(d) = rest.get(i + 1) {
+                            match d.parse::<i32>() {
+                                Ok(n) => {
+                                    obj.insert("maxDepth".to_string(), json!(n));
+                                    i += 1;
+                                }
+                                Err(_) => {
+                                    return Err(ParseError::InvalidValue {
+                                        message: format!("Invalid depth value: {}", d),
+                                        usage: "diff url <url1> <url2> --depth <n>",
+                                    });
+                                }
+                            }
+                        } else {
+                            return Err(ParseError::MissingArguments {
+                                context: "diff url --depth".to_string(),
+                                usage: "diff url <url1> <url2> --depth <n>",
+                            });
+                        }
+                    }
                     other if other.starts_with('-') => {
                         return Err(ParseError::InvalidValue {
                             message: format!("Unknown flag: {}", other),
-                            usage: "diff url <url1> <url2> [--screenshot] [--full] [--wait-until <strategy>]",
+                            usage: "diff url <url1> <url2> [--screenshot] [--full] [--wait-until <strategy>] [--selector <sel>] [--compact] [--depth <n>]",
                         });
                     }
                     other => {
                         return Err(ParseError::InvalidValue {
                             message: format!("Unexpected argument: {}", other),
-                            usage: "diff url <url1> <url2> [--screenshot] [--full] [--wait-until <strategy>]",
+                            usage: "diff url <url1> <url2> [--screenshot] [--full] [--wait-until <strategy>] [--selector <sel>] [--compact] [--depth <n>]",
                         });
                     }
                 }
@@ -3207,6 +3258,91 @@ mod tests {
     #[test]
     fn test_diff_url_missing_second_url() {
         let result = parse_command(&args("diff url https://a.com"), &default_flags());
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::MissingArguments { .. }
+        ));
+    }
+
+    #[test]
+    fn test_diff_snapshot_depth_invalid_value() {
+        let result = parse_command(&args("diff snapshot --depth abc"), &default_flags());
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::InvalidValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_diff_screenshot_threshold_invalid_value() {
+        let result = parse_command(
+            &args("diff screenshot --baseline b.png --threshold abc"),
+            &default_flags(),
+        );
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::InvalidValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_diff_url_with_selector() {
+        let cmd = parse_command(
+            &args("diff url https://a.com https://b.com --selector #main"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "diff_url");
+        assert_eq!(cmd["selector"], "#main");
+    }
+
+    #[test]
+    fn test_diff_url_with_compact_depth() {
+        let cmd = parse_command(
+            &args("diff url https://a.com https://b.com --compact --depth 3"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "diff_url");
+        assert_eq!(cmd["compact"], true);
+        assert_eq!(cmd["maxDepth"], 3);
+    }
+
+    #[test]
+    fn test_diff_url_with_short_snapshot_flags() {
+        let cmd = parse_command(
+            &args("diff url https://a.com https://b.com -s .content -c -d 2"),
+            &default_flags(),
+        )
+        .unwrap();
+        assert_eq!(cmd["action"], "diff_url");
+        assert_eq!(cmd["selector"], ".content");
+        assert_eq!(cmd["compact"], true);
+        assert_eq!(cmd["maxDepth"], 2);
+    }
+
+    #[test]
+    fn test_diff_url_depth_invalid_value() {
+        let result = parse_command(
+            &args("diff url https://a.com https://b.com --depth abc"),
+            &default_flags(),
+        );
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::InvalidValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_diff_url_selector_missing_value() {
+        let result = parse_command(
+            &args("diff url https://a.com https://b.com --selector"),
+            &default_flags(),
+        );
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),

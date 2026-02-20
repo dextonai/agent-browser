@@ -1044,6 +1044,9 @@ export interface DiffUrlCommand extends BaseCommand {
   screenshot?: boolean;
   fullPage?: boolean;
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
+  selector?: string;
+  compact?: boolean;
+  maxDepth?: number;
 }
 
 // Response types

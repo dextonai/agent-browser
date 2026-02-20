@@ -1361,6 +1361,55 @@ describe('parseCommand', () => {
       );
       expect(result.success).toBe(false);
     });
+
+    it('should parse diff_url with selector', () => {
+      const result = parseCommand(
+        cmd({
+          id: '1',
+          action: 'diff_url',
+          url1: 'https://a.com',
+          url2: 'https://b.com',
+          selector: '#main',
+        })
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.command.selector).toBe('#main');
+      }
+    });
+
+    it('should parse diff_url with all snapshot options', () => {
+      const result = parseCommand(
+        cmd({
+          id: '1',
+          action: 'diff_url',
+          url1: 'https://a.com',
+          url2: 'https://b.com',
+          selector: '#content',
+          compact: true,
+          maxDepth: 5,
+        })
+      );
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.command.selector).toBe('#content');
+        expect(result.command.compact).toBe(true);
+        expect(result.command.maxDepth).toBe(5);
+      }
+    });
+
+    it('should reject diff_url with negative maxDepth', () => {
+      const result = parseCommand(
+        cmd({
+          id: '1',
+          action: 'diff_url',
+          url1: 'https://a.com',
+          url2: 'https://b.com',
+          maxDepth: -1,
+        })
+      );
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('invalid commands', () => {
