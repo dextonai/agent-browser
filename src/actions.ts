@@ -123,10 +123,16 @@ import type {
   RecordingStartCommand,
   RecordingStopCommand,
   RecordingRestartCommand,
+  DiffSnapshotCommand,
+  DiffScreenshotCommand,
+  DiffUrlCommand,
   Annotation,
   NavigateData,
   ScreenshotData,
   EvaluateData,
+  DiffSnapshotData,
+  DiffScreenshotData,
+  DiffUrlData,
   ContentData,
   TabListData,
   TabNewData,
@@ -141,6 +147,7 @@ import type {
   StylesData,
 } from './types.js';
 import { successResponse, errorResponse } from './protocol.js';
+import { diffSnapshots, diffScreenshots } from './diff.js';
 
 // Callback for screencast frames - will be set by the daemon when streaming is active
 let screencastFrameCallback: ((frame: ScreencastFrame) => void) | null = null;
@@ -486,6 +493,12 @@ export async function executeCommand(command: Command, browser: BrowserManager):
         return await handleRecordingStop(command, browser);
       case 'recording_restart':
         return await handleRecordingRestart(command, browser);
+      case 'diff_snapshot':
+        return await handleDiffSnapshot(command, browser);
+      case 'diff_screenshot':
+        return await handleDiffScreenshot(command, browser);
+      case 'diff_url':
+        return await handleDiffUrl(command, browser);
       default: {
         // TypeScript narrows to never here, but we handle it for safety
         const unknownCommand = command as { id: string; action: string };
@@ -2463,4 +2476,114 @@ async function handleRecordingRestart(
     previousPath: result.previousPath,
     stopped: result.stopped,
   });
+}
+
+// Diff handlers
+
+async function handleDiffSnapshot(
+  command: DiffSnapshotCommand,
+  browser: BrowserManager
+): Promise<Response> {
+  let before: string;
+
+  if (command.baseline) {
+    try {
+      before = fs.readFileSync(command.baseline, 'utf-8');
+    } catch {
+      return errorResponse(command.id, `Cannot read baseline file: ${command.baseline}`);
+    }
+  } else {
+    before = browser.getLastSnapshot();
+    if (!before) {
+      return errorResponse(
+        command.id,
+        'No previous snapshot in this session. Take a snapshot first, or use --baseline <file>.'
+      );
+    }
+  }
+
+  const { tree } = await browser.getSnapshot({
+    selector: command.selector,
+    compact: command.compact,
+    maxDepth: command.maxDepth,
+  });
+
+  const after = tree || 'Empty page';
+  const result = diffSnapshots(before, after);
+  return successResponse(command.id, result);
+}
+
+async function handleDiffScreenshot(
+  command: DiffScreenshotCommand,
+  browser: BrowserManager
+): Promise<Response> {
+  if (!fs.existsSync(command.baseline)) {
+    return errorResponse(command.id, `Baseline file not found: ${command.baseline}`);
+  }
+
+  const page = browser.getPage();
+  let target: Page | ReturnType<Page['locator']> = page;
+  if (command.selector) {
+    const locator = browser.getLocatorFromRef(command.selector) || page.locator(command.selector);
+    target = locator;
+  }
+
+  const screenshotBuffer = await (target as Page).screenshot({
+    fullPage: command.fullPage,
+    type: 'png',
+  });
+
+  const result = await diffScreenshots(page, command.baseline, screenshotBuffer, {
+    threshold: command.threshold,
+    outputPath: command.output,
+  });
+
+  return successResponse(command.id, result);
+}
+
+async function handleDiffUrl(command: DiffUrlCommand, browser: BrowserManager): Promise<Response> {
+  const page = browser.getPage();
+
+  // Capture state of url1
+  await page.goto(command.url1, { waitUntil: 'load' });
+  const { tree: tree1 } = await browser.getSnapshot();
+  const snapshot1 = tree1 || 'Empty page';
+  let screenshot1: Buffer | undefined;
+  if (command.screenshot) {
+    screenshot1 = await page.screenshot({ fullPage: command.fullPage, type: 'png' });
+  }
+
+  // Capture state of url2
+  await page.goto(command.url2, { waitUntil: 'load' });
+  const { tree: tree2 } = await browser.getSnapshot();
+  const snapshot2 = tree2 || 'Empty page';
+
+  const snapshotDiff = diffSnapshots(snapshot1, snapshot2);
+
+  const result: DiffUrlData = { snapshot: snapshotDiff };
+
+  if (command.screenshot && screenshot1) {
+    const screenshot2 = await page.screenshot({ fullPage: command.fullPage, type: 'png' });
+    // Write screenshot1 to a temp file for the diffScreenshots function
+    const tmpDir = path.join(
+      process.env.HOME || process.env.USERPROFILE || '/tmp',
+      '.agent-browser',
+      'tmp',
+      'diffs'
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpBaseline = path.join(tmpDir, `baseline-${Date.now()}.png`);
+    fs.writeFileSync(tmpBaseline, screenshot1);
+    try {
+      result.screenshot = await diffScreenshots(page, tmpBaseline, screenshot2, {});
+    } finally {
+      try {
+        fs.unlinkSync(tmpBaseline);
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  }
+
+  return successResponse(command.id, result);
 }

@@ -1014,7 +1014,36 @@ export type Command =
   | InputKeyboardCommand
   | InputTouchCommand
   | SwipeCommand
-  | DeviceListCommand;
+  | DeviceListCommand
+  | DiffSnapshotCommand
+  | DiffScreenshotCommand
+  | DiffUrlCommand;
+
+// Diff commands
+export interface DiffSnapshotCommand extends BaseCommand {
+  action: 'diff_snapshot';
+  baseline?: string;
+  selector?: string;
+  compact?: boolean;
+  maxDepth?: number;
+}
+
+export interface DiffScreenshotCommand extends BaseCommand {
+  action: 'diff_screenshot';
+  baseline: string;
+  output?: string;
+  threshold?: number;
+  selector?: string;
+  fullPage?: boolean;
+}
+
+export interface DiffUrlCommand extends BaseCommand {
+  action: 'diff_url';
+  url1: string;
+  url2: string;
+  screenshot?: boolean;
+  fullPage?: boolean;
+}
 
 // Response types
 export interface SuccessResponse<T = unknown> {
@@ -1143,6 +1172,29 @@ export interface ElementStyleInfo {
 
 export interface StylesData {
   elements: ElementStyleInfo[];
+}
+
+// Diff response data
+export interface DiffSnapshotData {
+  diff: string;
+  additions: number;
+  removals: number;
+  unchanged: number;
+  changed: boolean;
+}
+
+export interface DiffScreenshotData {
+  diffPath: string;
+  totalPixels: number;
+  differentPixels: number;
+  mismatchPercentage: number;
+  match: boolean;
+  dimensionMismatch?: boolean;
+}
+
+export interface DiffUrlData {
+  snapshot: DiffSnapshotData;
+  screenshot?: DiffScreenshotData;
 }
 
 // Browser state

@@ -1037,8 +1037,141 @@ pub fn parse_command(args: &[String], flags: &Flags) -> Result<Value, ParseError
             }
         }
 
+        "diff" => parse_diff(&rest, &id, flags),
+
         _ => Err(ParseError::UnknownCommand {
             command: cmd.to_string(),
+        }),
+    }
+}
+
+fn parse_diff(rest: &[&str], id: &str, flags: &Flags) -> Result<Value, ParseError> {
+    const VALID: &[&str] = &["snapshot", "screenshot", "url"];
+
+    match rest.first().copied() {
+        Some("snapshot") => {
+            let mut cmd = json!({ "id": id, "action": "diff_snapshot" });
+            let obj = cmd.as_object_mut().unwrap();
+            let mut i = 1;
+            while i < rest.len() {
+                match rest[i] {
+                    "-b" | "--baseline" => {
+                        if let Some(path) = rest.get(i + 1) {
+                            obj.insert("baseline".to_string(), json!(path));
+                            i += 1;
+                        }
+                    }
+                    "-s" | "--selector" => {
+                        if let Some(s) = rest.get(i + 1) {
+                            obj.insert("selector".to_string(), json!(s));
+                            i += 1;
+                        }
+                    }
+                    "-c" | "--compact" => {
+                        obj.insert("compact".to_string(), json!(true));
+                    }
+                    "-d" | "--depth" => {
+                        if let Some(d) = rest.get(i + 1) {
+                            if let Ok(n) = d.parse::<i32>() {
+                                obj.insert("maxDepth".to_string(), json!(n));
+                                i += 1;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            Ok(cmd)
+        }
+        Some("screenshot") => {
+            let mut cmd = json!({ "id": id, "action": "diff_screenshot" });
+            let obj = cmd.as_object_mut().unwrap();
+            let mut i = 1;
+            while i < rest.len() {
+                match rest[i] {
+                    "-b" | "--baseline" => {
+                        if let Some(path) = rest.get(i + 1) {
+                            obj.insert("baseline".to_string(), json!(path));
+                            i += 1;
+                        }
+                    }
+                    "-o" | "--output" => {
+                        if let Some(path) = rest.get(i + 1) {
+                            obj.insert("output".to_string(), json!(path));
+                            i += 1;
+                        }
+                    }
+                    "-t" | "--threshold" => {
+                        if let Some(t) = rest.get(i + 1) {
+                            if let Ok(n) = t.parse::<f64>() {
+                                obj.insert("threshold".to_string(), json!(n));
+                                i += 1;
+                            }
+                        }
+                    }
+                    "-s" | "--selector" => {
+                        if let Some(s) = rest.get(i + 1) {
+                            obj.insert("selector".to_string(), json!(s));
+                            i += 1;
+                        }
+                    }
+                    "--full" => {
+                        obj.insert("fullPage".to_string(), json!(true));
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            if !obj.contains_key("baseline") {
+                return Err(ParseError::MissingArguments {
+                    context: "diff screenshot".to_string(),
+                    usage: "diff screenshot --baseline <file>",
+                });
+            }
+            Ok(cmd)
+        }
+        Some("url") => {
+            let url1 = rest.get(1).ok_or_else(|| ParseError::MissingArguments {
+                context: "diff url".to_string(),
+                usage: "diff url <url1> <url2>",
+            })?;
+            let url2 = rest.get(2).ok_or_else(|| ParseError::MissingArguments {
+                context: "diff url".to_string(),
+                usage: "diff url <url1> <url2>",
+            })?;
+            let mut cmd = json!({
+                "id": id,
+                "action": "diff_url",
+                "url1": url1,
+                "url2": url2,
+            });
+            let obj = cmd.as_object_mut().unwrap();
+            let mut i = 3;
+            while i < rest.len() {
+                match rest[i] {
+                    "--screenshot" => {
+                        obj.insert("screenshot".to_string(), json!(true));
+                    }
+                    "--full" => {
+                        obj.insert("fullPage".to_string(), json!(true));
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            if flags.full {
+                obj.insert("fullPage".to_string(), json!(true));
+            }
+            Ok(cmd)
+        }
+        Some(sub) => Err(ParseError::UnknownSubcommand {
+            subcommand: sub.to_string(),
+            valid_options: VALID,
+        }),
+        None => Err(ParseError::MissingArguments {
+            context: "diff".to_string(),
+            usage: "diff <snapshot|screenshot|url>",
         }),
     }
 }

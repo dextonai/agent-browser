@@ -254,6 +254,19 @@ agent-browser dialog accept [text]    # Accept (with optional prompt text)
 agent-browser dialog dismiss          # Dismiss
 ```
 
+### Diff
+
+```bash
+agent-browser diff snapshot                              # Compare current vs last snapshot
+agent-browser diff snapshot --baseline before.txt        # Compare current vs saved snapshot file
+agent-browser diff snapshot --selector "#main" --compact # Scoped snapshot diff
+agent-browser diff screenshot --baseline before.png      # Visual pixel diff against baseline
+agent-browser diff screenshot --baseline b.png -o d.png  # Save diff image to custom path
+agent-browser diff screenshot --baseline b.png -t 0.2    # Adjust color threshold (0-1)
+agent-browser diff url https://v1.com https://v2.com     # Compare two URLs (snapshot diff)
+agent-browser diff url https://v1.com https://v2.com --screenshot  # Also visual diff
+```
+
 ### Debug
 
 ```bash

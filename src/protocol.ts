@@ -740,6 +740,32 @@ const deviceListSchema = baseCommandSchema.extend({
   action: z.literal('device_list'),
 });
 
+// Diff schemas
+const diffSnapshotSchema = baseCommandSchema.extend({
+  action: z.literal('diff_snapshot'),
+  baseline: z.string().optional(),
+  selector: z.string().optional(),
+  compact: z.boolean().optional(),
+  maxDepth: z.number().nonnegative().optional(),
+});
+
+const diffScreenshotSchema = baseCommandSchema.extend({
+  action: z.literal('diff_screenshot'),
+  baseline: z.string().min(1),
+  output: z.string().optional(),
+  threshold: z.number().min(0).max(1).optional(),
+  selector: z.string().min(1).optional(),
+  fullPage: z.boolean().optional(),
+});
+
+const diffUrlSchema = baseCommandSchema.extend({
+  action: z.literal('diff_url'),
+  url1: z.string().min(1),
+  url2: z.string().min(1),
+  screenshot: z.boolean().optional(),
+  fullPage: z.boolean().optional(),
+});
+
 const pressSchema = baseCommandSchema.extend({
   action: z.literal('press'),
   key: z.string().min(1),
@@ -972,6 +998,9 @@ const commandSchema = z.discriminatedUnion('action', [
   inputTouchSchema,
   swipeSchema,
   deviceListSchema,
+  diffSnapshotSchema,
+  diffScreenshotSchema,
+  diffUrlSchema,
 ]);
 
 // Parse result type

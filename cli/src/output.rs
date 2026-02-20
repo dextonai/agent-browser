@@ -29,8 +29,148 @@ pub fn print_response(resp: &Response, json_mode: bool, action: Option<&str>) {
         }
         // Snapshot
         if let Some(snapshot) = data.get("snapshot").and_then(|v| v.as_str()) {
-            println!("{}", snapshot);
+            // Plain snapshot response (not diff)
+            if data.get("diff").is_none() && data.get("changed").is_none() {
+                println!("{}", snapshot);
+                return;
+            }
+        }
+        // Diff snapshot response
+        if let Some(diff) = data.get("diff").and_then(|v| v.as_str()) {
+            if data.get("changed").is_some() {
+                let changed = data
+                    .get("changed")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if !changed {
+                    println!("{} No changes detected", color::success_indicator());
+                } else {
+                    for line in diff.lines() {
+                        if line.starts_with("+ ") {
+                            println!("{}", color::green(line));
+                        } else if line.starts_with("- ") {
+                            println!("{}", color::red(line));
+                        } else {
+                            println!("{}", color::dim(line));
+                        }
+                    }
+                    let additions = data.get("additions").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let removals = data.get("removals").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let unchanged = data.get("unchanged").and_then(|v| v.as_i64()).unwrap_or(0);
+                    println!(
+                        "\n{} additions, {} removals, {} unchanged",
+                        color::green(&additions.to_string()),
+                        color::red(&removals.to_string()),
+                        unchanged
+                    );
+                }
+                return;
+            }
+        }
+        // Diff screenshot response
+        if let Some(diff_path) = data.get("diffPath").and_then(|v| v.as_str()) {
+            let mismatch = data
+                .get("mismatchPercentage")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let is_match = data
+                .get("match")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let dim_mismatch = data
+                .get("dimensionMismatch")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if dim_mismatch {
+                println!(
+                    "{} Images have different dimensions",
+                    color::error_indicator()
+                );
+            } else if is_match {
+                println!("{} Images match (0% difference)", color::success_indicator());
+            } else {
+                println!(
+                    "{} {:.2}% pixels differ",
+                    color::error_indicator(),
+                    mismatch
+                );
+            }
+            println!("  Diff image: {}", color::green(diff_path));
+            let total = data.get("totalPixels").and_then(|v| v.as_i64()).unwrap_or(0);
+            let different = data
+                .get("differentPixels")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            println!(
+                "  {} different / {} total pixels",
+                color::red(&different.to_string()),
+                total
+            );
             return;
+        }
+        // Diff url response (contains nested snapshot + optional screenshot)
+        if data.get("snapshot").is_some() && data.get("changed").is_none() {
+            if let Some(snap_data) = data.get("snapshot").and_then(|v| v.as_object()) {
+                if snap_data.get("diff").is_some() {
+                    println!("{}", color::bold("Snapshot diff:"));
+                    let changed = snap_data
+                        .get("changed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if !changed {
+                        println!("  {}", color::dim("No changes"));
+                    } else if let Some(diff) = snap_data.get("diff").and_then(|v| v.as_str()) {
+                        for line in diff.lines() {
+                            if line.starts_with("+ ") {
+                                println!("{}", color::green(line));
+                            } else if line.starts_with("- ") {
+                                println!("{}", color::red(line));
+                            } else {
+                                println!("{}", color::dim(line));
+                            }
+                        }
+                        let additions =
+                            snap_data.get("additions").and_then(|v| v.as_i64()).unwrap_or(0);
+                        let removals =
+                            snap_data.get("removals").and_then(|v| v.as_i64()).unwrap_or(0);
+                        let unchanged =
+                            snap_data.get("unchanged").and_then(|v| v.as_i64()).unwrap_or(0);
+                        println!(
+                            "\n{} additions, {} removals, {} unchanged",
+                            color::green(&additions.to_string()),
+                            color::red(&removals.to_string()),
+                            unchanged
+                        );
+                    }
+                    if let Some(ss_data) = data.get("screenshot").and_then(|v| v.as_object()) {
+                        println!("\n{}", color::bold("Screenshot diff:"));
+                        let mismatch = ss_data
+                            .get("mismatchPercentage")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.0);
+                        let is_match = ss_data
+                            .get("match")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        if is_match {
+                            println!(
+                                "  {} Images match (0% difference)",
+                                color::success_indicator()
+                            );
+                        } else {
+                            println!(
+                                "  {} {:.2}% pixels differ",
+                                color::error_indicator(),
+                                mismatch
+                            );
+                        }
+                        if let Some(p) = ss_data.get("diffPath").and_then(|v| v.as_str()) {
+                            println!("  Diff image: {}", color::green(p));
+                        }
+                    }
+                    return;
+                }
+            }
         }
         // Title
         if let Some(title) = data.get("title").and_then(|v| v.as_str()) {
@@ -1850,6 +1990,61 @@ Examples:
 "##
         }
 
+        "diff" => {
+            r##"
+agent-browser diff - Compare page states
+
+Subcommands:
+
+  diff snapshot                   Compare current snapshot to last snapshot in session
+  diff screenshot --baseline <f>  Visual pixel diff against a baseline image
+  diff url <url1> <url2>          Compare two pages
+
+Snapshot Diff:
+
+  Usage: agent-browser diff snapshot [options]
+
+  Options:
+    -b, --baseline <file>    Compare against a saved snapshot file
+    -s, --selector <sel>     Scope snapshot to a CSS selector or @ref
+    -c, --compact            Use compact snapshot format
+    -d, --depth <n>          Limit snapshot tree depth
+
+  Without --baseline, compares against the last snapshot taken in this session.
+
+Screenshot Diff:
+
+  Usage: agent-browser diff screenshot --baseline <file> [options]
+
+  Options:
+    -b, --baseline <file>    Baseline image to compare against (required)
+    -o, --output <file>      Path for the diff image (default: temp dir)
+    -t, --threshold <0-1>    Color distance threshold (default: 0.1)
+    -s, --selector <sel>     Scope screenshot to element
+        --full               Full page screenshot
+
+URL Diff:
+
+  Usage: agent-browser diff url <url1> <url2> [options]
+
+  Options:
+    --screenshot             Also compare screenshots (default: snapshot only)
+    --full                   Full page screenshots
+
+Global Options:
+  --json               Output as JSON
+  --session <name>     Use specific session
+
+Examples:
+  agent-browser diff snapshot
+  agent-browser diff snapshot --baseline before.txt
+  agent-browser diff screenshot --baseline before.png
+  agent-browser diff screenshot --baseline before.png --output diff.png --threshold 0.2
+  agent-browser diff url https://staging.example.com https://prod.example.com
+  agent-browser diff url https://v1.example.com https://v2.example.com --screenshot
+"##
+        }
+
         _ => return false,
     };
     println!("{}", help.trim());
@@ -1921,6 +2116,11 @@ Storage:
 
 Tabs:
   tab [new|list|close|<n>]   Manage tabs
+
+Diff:
+  diff snapshot              Compare current vs last snapshot
+  diff screenshot --baseline Compare current vs baseline image
+  diff url <u1> <u2>         Compare two pages
 
 Debug:
   trace start|stop [path]    Record Playwright trace
