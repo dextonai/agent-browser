@@ -1,11 +1,13 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Build output — dist/ is COMMITTED so git-based installs work
+# (npm install from github: URLs does not run `tsc`)
+# dist/
 
-# Native binaries (keep the launcher scripts)
-bin/agent-browser-*
+# Native binaries — platform binaries are COMMITTED for Docker/CI
+# (postinstall.js download may not run with bun or in all environments)
+# bin/agent-browser-*
 !bin/agent-browser
 !bin/agent-browser.cmd
 
