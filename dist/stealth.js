@@ -88,8 +88,7 @@ export function getRealisticUserAgent() {
     const os = process.platform;
     const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
     const platformAgents = REALISTIC_USER_AGENTS[os];
-    const agents = platformAgents?.[arch]
-        ?? REALISTIC_USER_AGENTS.linux.x64;
+    const agents = platformAgents?.[arch] ?? REALISTIC_USER_AGENTS.linux.x64;
     return agents[Math.floor(Math.random() * agents.length)];
 }
 // ─────────────────────────────────────────────────────────────────────────────

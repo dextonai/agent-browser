@@ -980,7 +980,7 @@ export class BrowserManager {
         // Stealth mode: inject anti-detection chromium args and realistic user-agent
         const stealthEnabled = isStealthEnabled(options.stealth);
         // Build base args array with stealth + file access flags
-        const stealthArgs = (stealthEnabled && browserType === 'chromium') ? STEALTH_CHROMIUM_ARGS : [];
+        const stealthArgs = stealthEnabled && browserType === 'chromium' ? STEALTH_CHROMIUM_ARGS : [];
         const fileAccessArgs = options.allowFileAccess
             ? ['--allow-file-access-from-files', '--allow-file-access']
             : [];
@@ -1016,7 +1016,9 @@ export class BrowserManager {
                 extraHTTPHeaders: options.headers,
                 userAgent,
                 ...(options.proxy && { proxy: options.proxy }),
-                ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
+                ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? stealthEnabled,
+                bypassCSP: stealthEnabled,
+                acceptDownloads: true,
             });
             this.isPersistentContext = true;
         }
@@ -1032,7 +1034,9 @@ export class BrowserManager {
                 extraHTTPHeaders: options.headers,
                 userAgent,
                 ...(options.proxy && { proxy: options.proxy }),
-                ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
+                ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? stealthEnabled,
+                bypassCSP: stealthEnabled,
+                acceptDownloads: true,
             });
             this.isPersistentContext = true;
         }
@@ -1097,7 +1101,9 @@ export class BrowserManager {
                 userAgent,
                 storageState,
                 ...(options.proxy && { proxy: options.proxy }),
-                ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
+                ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? stealthEnabled,
+                bypassCSP: stealthEnabled,
+                acceptDownloads: true,
             });
         }
         // Apply stealth init scripts (patches navigator.webdriver, plugins, WebGL, etc.)

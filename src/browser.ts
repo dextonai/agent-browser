@@ -1235,7 +1235,9 @@ export class BrowserManager {
           extraHTTPHeaders: options.headers,
           userAgent,
           ...(options.proxy && { proxy: options.proxy }),
-          ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
+          ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? stealthEnabled,
+          bypassCSP: stealthEnabled,
+          acceptDownloads: true,
         }
       );
       this.isPersistentContext = true;
@@ -1251,7 +1253,9 @@ export class BrowserManager {
         extraHTTPHeaders: options.headers,
         userAgent,
         ...(options.proxy && { proxy: options.proxy }),
-        ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
+        ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? stealthEnabled,
+        bypassCSP: stealthEnabled,
+        acceptDownloads: true,
       });
       this.isPersistentContext = true;
     } else {
@@ -1336,7 +1340,9 @@ export class BrowserManager {
         userAgent,
         storageState,
         ...(options.proxy && { proxy: options.proxy }),
-        ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
+        ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? stealthEnabled,
+        bypassCSP: stealthEnabled,
+        acceptDownloads: true,
       });
     }
 
