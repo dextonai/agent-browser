@@ -199,6 +199,7 @@ pub struct Flags {
     pub auto_connect: bool,
     pub session_name: Option<String>,
     pub annotate: bool,
+    pub no_stealth: bool,
 
     // Track which launch-time options were explicitly passed via CLI
     // (as opposed to being set only via environment variables)
@@ -278,6 +279,7 @@ pub fn parse_flags(args: &[String]) -> Flags {
             .or(config.session_name),
         annotate: env_var_is_truthy("AGENT_BROWSER_ANNOTATE")
             || config.annotate.unwrap_or(false),
+        no_stealth: env_var_is_truthy("AGENT_BROWSER_NO_STEALTH"),
         cli_executable_path: false,
         cli_extensions: false,
         cli_profile: false,
@@ -425,6 +427,9 @@ pub fn parse_flags(args: &[String]) -> Flags {
                 flags.annotate = val;
                 if consumed { i += 1; }
             }
+            "--no-stealth" => {
+                flags.no_stealth = true;
+            }
             "--config" => {
                 // Already handled by load_config(); skip the value
                 i += 1;
@@ -450,6 +455,7 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
         "--allow-file-access",
         "--auto-connect",
         "--annotate",
+        "--no-stealth",
     ];
     // Global flags that always take a value (need to skip the next arg too)
     const GLOBAL_FLAGS_WITH_VALUE: &[&str] = &[

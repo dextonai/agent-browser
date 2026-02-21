@@ -30,6 +30,7 @@ export interface LaunchCommand extends BaseCommand {
     provider?: string;
     ignoreHTTPSErrors?: boolean;
     allowFileAccess?: boolean;
+    stealth?: boolean;
     autoStateFilePath?: string;
 }
 export interface NavigateCommand extends BaseCommand {

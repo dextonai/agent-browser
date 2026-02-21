@@ -494,7 +494,8 @@ fn main() {
         || flags.proxy.is_some()
         || flags.args.is_some()
         || flags.user_agent.is_some()
-        || flags.allow_file_access)
+        || flags.allow_file_access
+        || flags.no_stealth)
         && flags.cdp.is_none()
         && flags.provider.is_none()
     {
@@ -554,6 +555,10 @@ fn main() {
 
         if flags.allow_file_access {
             launch_cmd["allowFileAccess"] = json!(true);
+        }
+
+        if flags.no_stealth {
+            launch_cmd["stealth"] = json!(false);
         }
 
         match send_command(launch_cmd, &flags.session) {

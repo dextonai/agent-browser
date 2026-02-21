@@ -6,6 +6,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { getEnhancedSnapshot, parseRef } from './snapshot.js';
 import { safeHeaderMerge } from './state-utils.js';
 import { getEncryptionKey, isEncryptedPayload, decryptData, ENCRYPTION_KEY_ENV, } from './state-utils.js';
+import { STEALTH_CHROMIUM_ARGS, getRealisticUserAgent, applyStealthToContext, isStealthEnabled, } from './stealth.js';
 /**
  * Manages the Playwright browser lifecycle with multiple tabs/windows
  */
@@ -976,16 +977,20 @@ export class BrowserManager {
             throw new Error('allowFileAccess is only supported in Chromium');
         }
         const launcher = browserType === 'firefox' ? firefox : browserType === 'webkit' ? webkit : chromium;
-        // Build base args array with file access flags if enabled
-        // --allow-file-access-from-files: allows file:// URLs to read other file:// URLs via XHR/fetch
-        // --allow-file-access: allows the browser to access local files in general
+        // Stealth mode: inject anti-detection chromium args and realistic user-agent
+        const stealthEnabled = isStealthEnabled(options.stealth);
+        // Build base args array with stealth + file access flags
+        const stealthArgs = (stealthEnabled && browserType === 'chromium') ? STEALTH_CHROMIUM_ARGS : [];
         const fileAccessArgs = options.allowFileAccess
             ? ['--allow-file-access-from-files', '--allow-file-access']
             : [];
-        const baseArgs = options.args
-            ? [...fileAccessArgs, ...options.args]
-            : fileAccessArgs.length > 0
-                ? fileAccessArgs
+        const combinedArgs = [...stealthArgs, ...fileAccessArgs, ...(options.args ?? [])];
+        const baseArgs = combinedArgs.length > 0 ? combinedArgs : undefined;
+        // Stealth user-agent: use realistic UA unless user explicitly provided one
+        const userAgent = options.userAgent
+            ? options.userAgent
+            : stealthEnabled
+                ? getRealisticUserAgent()
                 : undefined;
         // Auto-detect args that control window size and disable viewport emulation
         // so Playwright doesn't override the browser's own sizing behavior
@@ -1009,7 +1014,7 @@ export class BrowserManager {
                 args: allArgs,
                 viewport,
                 extraHTTPHeaders: options.headers,
-                userAgent: options.userAgent,
+                userAgent,
                 ...(options.proxy && { proxy: options.proxy }),
                 ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
             });
@@ -1025,7 +1030,7 @@ export class BrowserManager {
                 args: baseArgs,
                 viewport,
                 extraHTTPHeaders: options.headers,
-                userAgent: options.userAgent,
+                userAgent,
                 ...(options.proxy && { proxy: options.proxy }),
                 ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
             });
@@ -1089,11 +1094,15 @@ export class BrowserManager {
             context = await this.browser.newContext({
                 viewport,
                 extraHTTPHeaders: options.headers,
-                userAgent: options.userAgent,
+                userAgent,
                 storageState,
                 ...(options.proxy && { proxy: options.proxy }),
                 ignoreHTTPSErrors: options.ignoreHTTPSErrors ?? false,
             });
+        }
+        // Apply stealth init scripts (patches navigator.webdriver, plugins, WebGL, etc.)
+        if (stealthEnabled) {
+            await applyStealthToContext(context);
         }
         context.setDefaultTimeout(60000);
         this.contexts.push(context);

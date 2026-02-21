@@ -53,3 +53,4 @@ docs/package-lock.json
 
 # pnpm
 .pnpm-store/
+trace.json
