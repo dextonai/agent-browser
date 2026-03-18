@@ -2,6 +2,10 @@
 
 Instructions for AI coding agents working with this codebase.
 
+## Package Manager
+
+This project uses **pnpm**. Always use `pnpm` instead of `npm` or `yarn` for installing dependencies, running scripts, etc. (e.g., `pnpm install`, `pnpm run build`).
+
 ## Code Style
 
 - Do not use emojis in code, output, or documentation. Unicode symbols (✓, ✗, →, ⚠) are acceptable.
@@ -19,6 +23,43 @@ When adding or changing user-facing features (new flags, commands, behaviors, en
 5. Inline doc comments in the relevant source files
 
 This applies to changes that either human users or AI agents would need to know about. Do not skip any of these locations.
+
+In the `docs/src/app/` MDX files, always use HTML `<table>` syntax for tables (not markdown pipe tables). This matches the existing convention across the docs site.
+
+## Architecture
+
+This is a Rust codebase. The browser automation daemon lives in `cli/src/native/` (daemon, actions, browser, CDP client, snapshot, state). The `--engine` flag selects Chrome vs Lightpanda. The `install` command downloads Chrome from Chrome for Testing directly.
+
+## Testing
+
+### Unit Tests
+
+```bash
+cd cli && cargo test
+```
+
+Runs all unit tests (~320 tests). These are fast and don't require Chrome.
+
+### End-to-End Tests
+
+```bash
+cd cli && cargo test e2e -- --ignored --test-threads=1
+```
+
+Runs 18 e2e tests that launch real headless Chrome instances and exercise the full native daemon command pipeline. Requirements:
+
+- Chrome must be installed
+- Must run serially (`--test-threads=1`) to avoid Chrome instance contention
+- Tests are `#[ignore]`'d so they don't run during normal `cargo test`
+
+The e2e tests live in `cli/src/native/e2e_tests.rs` and cover: launch/close, navigation, snapshots, screenshots, form interaction, cookies, storage, tabs, element queries, viewport/emulation, domain filtering, diff, state management, error handling, and Phase 8 commands.
+
+### Linting and Formatting
+
+```bash
+cd cli && cargo fmt -- --check   # Check formatting
+cd cli && cargo clippy            # Lint
+```
 
 <!-- opensrc:start -->
 

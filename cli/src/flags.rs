@@ -8,12 +8,53 @@ const CONFIG_DIR: &str = ".agent-browser";
 const CONFIG_FILENAME: &str = "config.json";
 const PROJECT_CONFIG_FILENAME: &str = "agent-browser.json";
 
+/// Parse idle timeout from user-friendly format.
+/// Supports: "10s" (seconds), "3m" (minutes), "1h" (hours), or raw milliseconds.
+fn parse_idle_timeout(s: &str) -> Result<String, String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Err("Empty idle timeout".to_string());
+    }
+
+    // If the value ends with a unit suffix, convert it to milliseconds.
+    if s.chars().last().is_some_and(|c| c.is_ascii_alphabetic()) {
+        let (num_str, unit) = s.split_at(s.len() - 1);
+        let num: u64 = num_str.parse().map_err(|_| "Invalid number")?;
+
+        let ms = match unit {
+            "s" => num * 1000,
+            "m" => num * 60 * 1000,
+            "h" => num * 60 * 60 * 1000,
+            _ => return Err("Invalid idle timeout unit (use s, m, h, or raw ms)".to_string()),
+        };
+        return Ok(ms.to_string());
+    }
+
+    // Pure numbers are already expressed in milliseconds.
+    s.parse::<u64>().map_err(|_| "Invalid idle timeout")?;
+    Ok(s.to_string())
+}
+
+fn parse_idle_timeout_value(value: Option<String>, source: &str) -> Option<String> {
+    value.and_then(|raw| match parse_idle_timeout(&raw) {
+        Ok(ms) => Some(ms),
+        Err(e) => {
+            eprintln!(
+                "{} invalid idle timeout from {}: {}",
+                color::warning_indicator(),
+                source,
+                e
+            );
+            None
+        }
+    })
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub headed: Option<bool>,
     pub json: Option<bool>,
-    pub full: Option<bool>,
     pub debug: Option<bool>,
     pub session: Option<String>,
     pub session_name: Option<String>,
@@ -33,6 +74,19 @@ pub struct Config {
     pub auto_connect: Option<bool>,
     pub headers: Option<String>,
     pub annotate: Option<bool>,
+    pub color_scheme: Option<String>,
+    pub download_path: Option<String>,
+    pub content_boundaries: Option<bool>,
+    pub max_output: Option<usize>,
+    pub allowed_domains: Option<Vec<String>>,
+    pub action_policy: Option<String>,
+    pub confirm_actions: Option<String>,
+    pub confirm_interactive: Option<bool>,
+    pub engine: Option<String>,
+    pub screenshot_dir: Option<String>,
+    pub screenshot_quality: Option<u32>,
+    pub screenshot_format: Option<String>,
+    pub idle_timeout: Option<String>,
 }
 
 impl Config {
@@ -40,7 +94,6 @@ impl Config {
         Config {
             headed: other.headed.or(self.headed),
             json: other.json.or(self.json),
-            full: other.full.or(self.full),
             debug: other.debug.or(self.debug),
             session: other.session.or(self.session),
             session_name: other.session_name.or(self.session_name),
@@ -66,6 +119,19 @@ impl Config {
             auto_connect: other.auto_connect.or(self.auto_connect),
             headers: other.headers.or(self.headers),
             annotate: other.annotate.or(self.annotate),
+            color_scheme: other.color_scheme.or(self.color_scheme),
+            download_path: other.download_path.or(self.download_path),
+            content_boundaries: other.content_boundaries.or(self.content_boundaries),
+            max_output: other.max_output.or(self.max_output),
+            allowed_domains: other.allowed_domains.or(self.allowed_domains),
+            action_policy: other.action_policy.or(self.action_policy),
+            confirm_actions: other.confirm_actions.or(self.confirm_actions),
+            confirm_interactive: other.confirm_interactive.or(self.confirm_interactive),
+            engine: other.engine.or(self.engine),
+            screenshot_dir: other.screenshot_dir.or(self.screenshot_dir),
+            screenshot_quality: other.screenshot_quality.or(self.screenshot_quality),
+            screenshot_format: other.screenshot_format.or(self.screenshot_format),
+            idle_timeout: other.idle_timeout.or(self.idle_timeout),
         }
     }
 }
@@ -73,7 +139,13 @@ impl Config {
 fn read_config_file(path: &Path) -> Option<Config> {
     let content = fs::read_to_string(path).ok()?;
     match serde_json::from_str::<Config>(&content) {
-        Ok(config) => Some(config),
+        Ok(mut config) => {
+            config.idle_timeout = parse_idle_timeout_value(
+                config.idle_timeout.take(),
+                &format!("config file {}", path.display()),
+            );
+            Some(config)
+        }
         Err(e) => {
             eprintln!(
                 "{} invalid config file {}: {}",
@@ -112,6 +184,11 @@ fn parse_bool_arg(args: &[String], i: usize) -> (bool, bool) {
 /// Extract --config <path> from args before full flag parsing.
 /// Returns `Some(Some(path))` if --config <path> found, `Some(None)` if --config
 /// was the last arg with no value, `None` if --config not present.
+///
+/// Only flags that consume a following argument need to be listed here.
+/// Boolean flags (--content-boundaries, --confirm-interactive, etc.) are
+/// intentionally absent -- they don't take a value, so they can't cause
+/// the next argument to be mis-consumed.
 fn extract_config_path(args: &[String]) -> Option<Option<String>> {
     const FLAGS_WITH_VALUE: &[&str] = &[
         "--session",
@@ -129,6 +206,17 @@ fn extract_config_path(args: &[String]) -> Option<Option<String>> {
         "--provider",
         "--device",
         "--session-name",
+        "--color-scheme",
+        "--download-path",
+        "--max-output",
+        "--allowed-domains",
+        "--action-policy",
+        "--confirm-actions",
+        "--engine",
+        "--screenshot-dir",
+        "--screenshot-quality",
+        "--screenshot-format",
+        "--idle-timeout",
     ];
     let mut i = 0;
     while i < args.len() {
@@ -153,8 +241,7 @@ pub fn load_config(args: &[String]) -> Result<Config, String> {
         });
 
     if let Some((source, maybe_path)) = explicit {
-        let path_str =
-            maybe_path.ok_or_else(|| format!("{} requires a file path", source))?;
+        let path_str = maybe_path.ok_or_else(|| format!("{} requires a file path", source))?;
         let path = PathBuf::from(&path_str);
         if !path.exists() {
             return Err(format!("config file not found: {}", path_str));
@@ -178,7 +265,6 @@ pub fn load_config(args: &[String]) -> Result<Config, String> {
 
 pub struct Flags {
     pub json: bool,
-    pub full: bool,
     pub headed: bool,
     pub debug: bool,
     pub session: String,
@@ -200,6 +286,19 @@ pub struct Flags {
     pub session_name: Option<String>,
     pub annotate: bool,
     pub no_stealth: bool,
+    pub color_scheme: Option<String>,
+    pub download_path: Option<String>,
+    pub content_boundaries: bool,
+    pub max_output: Option<usize>,
+    pub allowed_domains: Option<Vec<String>>,
+    pub action_policy: Option<String>,
+    pub confirm_actions: Option<String>,
+    pub confirm_interactive: bool,
+    pub engine: Option<String>,
+    pub screenshot_dir: Option<String>,
+    pub screenshot_quality: Option<u32>,
+    pub screenshot_format: Option<String>,
+    pub idle_timeout: Option<String>, // Canonical milliseconds string for AGENT_BROWSER_IDLE_TIMEOUT_MS
 
     // Track which launch-time options were explicitly passed via CLI
     // (as opposed to being set only via environment variables)
@@ -212,6 +311,9 @@ pub struct Flags {
     pub cli_proxy: bool,
     pub cli_proxy_bypass: bool,
     pub cli_allow_file_access: bool,
+    pub cli_annotate: bool,
+    pub cli_download_path: bool,
+    pub cli_headed: bool,
 }
 
 pub fn parse_flags(args: &[String]) -> Flags {
@@ -237,49 +339,89 @@ pub fn parse_flags(args: &[String]) -> Flags {
     };
 
     let mut flags = Flags {
-        json: env_var_is_truthy("AGENT_BROWSER_JSON")
-            || config.json.unwrap_or(false),
-        full: env_var_is_truthy("AGENT_BROWSER_FULL")
-            || config.full.unwrap_or(false),
-        headed: env_var_is_truthy("AGENT_BROWSER_HEADED")
-            || config.headed.unwrap_or(false),
-        debug: env_var_is_truthy("AGENT_BROWSER_DEBUG")
-            || config.debug.unwrap_or(false),
-        session: env::var("AGENT_BROWSER_SESSION").ok()
+        json: env_var_is_truthy("AGENT_BROWSER_JSON") || config.json.unwrap_or(false),
+        headed: env_var_is_truthy("AGENT_BROWSER_HEADED") || config.headed.unwrap_or(false),
+        debug: env_var_is_truthy("AGENT_BROWSER_DEBUG") || config.debug.unwrap_or(false),
+        session: env::var("AGENT_BROWSER_SESSION")
+            .ok()
             .or(config.session)
             .unwrap_or_else(|| "default".to_string()),
         headers: config.headers,
-        executable_path: env::var("AGENT_BROWSER_EXECUTABLE_PATH").ok()
+        executable_path: env::var("AGENT_BROWSER_EXECUTABLE_PATH")
+            .ok()
             .or(config.executable_path),
         cdp: config.cdp,
         extensions,
-        profile: env::var("AGENT_BROWSER_PROFILE").ok()
-            .or(config.profile),
-        state: env::var("AGENT_BROWSER_STATE").ok()
-            .or(config.state),
-        proxy: env::var("AGENT_BROWSER_PROXY").ok()
-            .or(config.proxy),
-        proxy_bypass: env::var("AGENT_BROWSER_PROXY_BYPASS").ok()
+        profile: env::var("AGENT_BROWSER_PROFILE").ok().or(config.profile),
+        state: env::var("AGENT_BROWSER_STATE").ok().or(config.state),
+        proxy: env::var("AGENT_BROWSER_PROXY").ok().or(config.proxy),
+        proxy_bypass: env::var("AGENT_BROWSER_PROXY_BYPASS")
+            .ok()
             .or(config.proxy_bypass),
-        args: env::var("AGENT_BROWSER_ARGS").ok()
-            .or(config.args),
-        user_agent: env::var("AGENT_BROWSER_USER_AGENT").ok()
+        args: env::var("AGENT_BROWSER_ARGS").ok().or(config.args),
+        user_agent: env::var("AGENT_BROWSER_USER_AGENT")
+            .ok()
             .or(config.user_agent),
-        provider: env::var("AGENT_BROWSER_PROVIDER").ok()
-            .or(config.provider),
+        provider: env::var("AGENT_BROWSER_PROVIDER").ok().or(config.provider),
         ignore_https_errors: env_var_is_truthy("AGENT_BROWSER_IGNORE_HTTPS_ERRORS")
             || config.ignore_https_errors.unwrap_or(false),
         allow_file_access: env_var_is_truthy("AGENT_BROWSER_ALLOW_FILE_ACCESS")
             || config.allow_file_access.unwrap_or(false),
-        device: env::var("AGENT_BROWSER_IOS_DEVICE").ok()
-            .or(config.device),
+        device: env::var("AGENT_BROWSER_IOS_DEVICE").ok().or(config.device),
         auto_connect: env_var_is_truthy("AGENT_BROWSER_AUTO_CONNECT")
             || config.auto_connect.unwrap_or(false),
-        session_name: env::var("AGENT_BROWSER_SESSION_NAME").ok()
+        session_name: env::var("AGENT_BROWSER_SESSION_NAME")
+            .ok()
             .or(config.session_name),
         annotate: env_var_is_truthy("AGENT_BROWSER_ANNOTATE")
             || config.annotate.unwrap_or(false),
         no_stealth: env_var_is_truthy("AGENT_BROWSER_NO_STEALTH"),
+        color_scheme: env::var("AGENT_BROWSER_COLOR_SCHEME")
+            .ok()
+            .or(config.color_scheme),
+        download_path: env::var("AGENT_BROWSER_DOWNLOAD_PATH")
+            .ok()
+            .or(config.download_path),
+        content_boundaries: env_var_is_truthy("AGENT_BROWSER_CONTENT_BOUNDARIES")
+            || config.content_boundaries.unwrap_or(false),
+        max_output: env::var("AGENT_BROWSER_MAX_OUTPUT")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .or(config.max_output),
+        allowed_domains: env::var("AGENT_BROWSER_ALLOWED_DOMAINS")
+            .ok()
+            .map(|s| {
+                s.split(',')
+                    .map(|d| d.trim().to_lowercase())
+                    .filter(|d| !d.is_empty())
+                    .collect()
+            })
+            .or(config.allowed_domains),
+        action_policy: env::var("AGENT_BROWSER_ACTION_POLICY")
+            .ok()
+            .or(config.action_policy),
+        confirm_actions: env::var("AGENT_BROWSER_CONFIRM_ACTIONS")
+            .ok()
+            .or(config.confirm_actions),
+        confirm_interactive: env_var_is_truthy("AGENT_BROWSER_CONFIRM_INTERACTIVE")
+            || config.confirm_interactive.unwrap_or(false),
+        engine: env::var("AGENT_BROWSER_ENGINE").ok().or(config.engine),
+        screenshot_dir: env::var("AGENT_BROWSER_SCREENSHOT_DIR")
+            .ok()
+            .or(config.screenshot_dir),
+        screenshot_quality: env::var("AGENT_BROWSER_SCREENSHOT_QUALITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .or(config.screenshot_quality),
+        screenshot_format: env::var("AGENT_BROWSER_SCREENSHOT_FORMAT")
+            .ok()
+            .or(config.screenshot_format)
+            .filter(|s| s == "png" || s == "jpeg"),
+        idle_timeout: parse_idle_timeout_value(
+            env::var("AGENT_BROWSER_IDLE_TIMEOUT_MS").ok(),
+            "AGENT_BROWSER_IDLE_TIMEOUT_MS",
+        )
+        .or(config.idle_timeout),
         cli_executable_path: false,
         cli_extensions: false,
         cli_profile: false,
@@ -289,6 +431,9 @@ pub fn parse_flags(args: &[String]) -> Flags {
         cli_proxy: false,
         cli_proxy_bypass: false,
         cli_allow_file_access: false,
+        cli_annotate: false,
+        cli_download_path: false,
+        cli_headed: false,
     };
 
     let mut i = 0;
@@ -297,26 +442,41 @@ pub fn parse_flags(args: &[String]) -> Flags {
             "--json" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.json = val;
-                if consumed { i += 1; }
-            }
-            "--full" | "-f" => {
-                let (val, consumed) = parse_bool_arg(args, i);
-                flags.full = val;
-                if consumed { i += 1; }
+                if consumed {
+                    i += 1;
+                }
             }
             "--headed" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.headed = val;
-                if consumed { i += 1; }
+                flags.cli_headed = true;
+                if consumed {
+                    i += 1;
+                }
             }
             "--debug" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.debug = val;
-                if consumed { i += 1; }
+                if consumed {
+                    i += 1;
+                }
             }
             "--session" => {
                 if let Some(s) = args.get(i + 1) {
                     flags.session = s.clone();
+                    i += 1;
+                }
+            }
+            "--idle-timeout" => {
+                if let Some(s) = args.get(i + 1) {
+                    match parse_idle_timeout(s) {
+                        Ok(ms) => flags.idle_timeout = Some(ms),
+                        Err(e) => eprintln!(
+                            "{} Invalid --idle-timeout: {}",
+                            color::warning_indicator(),
+                            e
+                        ),
+                    }
                     i += 1;
                 }
             }
@@ -397,13 +557,17 @@ pub fn parse_flags(args: &[String]) -> Flags {
             "--ignore-https-errors" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.ignore_https_errors = val;
-                if consumed { i += 1; }
+                if consumed {
+                    i += 1;
+                }
             }
             "--allow-file-access" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.allow_file_access = val;
                 flags.cli_allow_file_access = true;
-                if consumed { i += 1; }
+                if consumed {
+                    i += 1;
+                }
             }
             "--device" => {
                 if let Some(d) = args.get(i + 1) {
@@ -414,7 +578,9 @@ pub fn parse_flags(args: &[String]) -> Flags {
             "--auto-connect" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.auto_connect = val;
-                if consumed { i += 1; }
+                if consumed {
+                    i += 1;
+                }
             }
             "--session-name" => {
                 if let Some(s) = args.get(i + 1) {
@@ -425,7 +591,110 @@ pub fn parse_flags(args: &[String]) -> Flags {
             "--annotate" => {
                 let (val, consumed) = parse_bool_arg(args, i);
                 flags.annotate = val;
-                if consumed { i += 1; }
+                flags.cli_annotate = true;
+                if consumed {
+                    i += 1;
+                }
+            }
+            "--color-scheme" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.color_scheme = Some(s.clone());
+                    i += 1;
+                }
+            }
+            "--download-path" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.download_path = Some(s.clone());
+                    flags.cli_download_path = true;
+                    i += 1;
+                }
+            }
+            "--content-boundaries" => {
+                let (val, consumed) = parse_bool_arg(args, i);
+                flags.content_boundaries = val;
+                if consumed {
+                    i += 1;
+                }
+            }
+            "--max-output" => {
+                if let Some(s) = args.get(i + 1) {
+                    if let Ok(n) = s.parse::<usize>() {
+                        flags.max_output = Some(n);
+                    }
+                    i += 1;
+                }
+            }
+            "--allowed-domains" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.allowed_domains = Some(
+                        s.split(',')
+                            .map(|d| d.trim().to_lowercase())
+                            .filter(|d| !d.is_empty())
+                            .collect(),
+                    );
+                    i += 1;
+                }
+            }
+            "--action-policy" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.action_policy = Some(s.clone());
+                    i += 1;
+                }
+            }
+            "--confirm-actions" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.confirm_actions = Some(s.clone());
+                    i += 1;
+                }
+            }
+            "--confirm-interactive" => {
+                let (val, consumed) = parse_bool_arg(args, i);
+                flags.confirm_interactive = val;
+                if consumed {
+                    i += 1;
+                }
+            }
+            "--engine" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.engine = Some(s.clone());
+                    i += 1;
+                }
+            }
+            "--screenshot-dir" => {
+                if let Some(s) = args.get(i + 1) {
+                    flags.screenshot_dir = Some(s.clone());
+                    i += 1;
+                }
+            }
+            "--screenshot-quality" => {
+                if let Some(s) = args.get(i + 1) {
+                    if let Ok(n) = s.parse::<u32>() {
+                        if n <= 100 {
+                            flags.screenshot_quality = Some(n);
+                        } else {
+                            eprintln!(
+                                "{} --screenshot-quality must be 0-100, got {}",
+                                color::warning_indicator(),
+                                n
+                            );
+                        }
+                    }
+                    i += 1;
+                }
+            }
+            "--screenshot-format" => {
+                if let Some(s) = args.get(i + 1) {
+                    if s == "png" || s == "jpeg" {
+                        flags.screenshot_format = Some(s.clone());
+                    } else {
+                        eprintln!(
+                            "{} --screenshot-format must be png or jpeg, got '{}'",
+                            color::warning_indicator(),
+                            s
+                        );
+                    }
+                    i += 1;
+                }
             }
             "--no-stealth" => {
                 flags.no_stealth = true;
@@ -448,7 +717,6 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
     // Boolean flags that optionally take true/false
     const GLOBAL_BOOL_FLAGS: &[&str] = &[
         "--json",
-        "--full",
         "--headed",
         "--debug",
         "--ignore-https-errors",
@@ -456,6 +724,8 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
         "--auto-connect",
         "--annotate",
         "--no-stealth",
+        "--content-boundaries",
+        "--confirm-interactive",
     ];
     // Global flags that always take a value (need to skip the next arg too)
     const GLOBAL_FLAGS_WITH_VALUE: &[&str] = &[
@@ -474,7 +744,18 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
         "--provider",
         "--device",
         "--session-name",
+        "--color-scheme",
+        "--download-path",
+        "--max-output",
+        "--allowed-domains",
+        "--action-policy",
+        "--confirm-actions",
         "--config",
+        "--engine",
+        "--screenshot-dir",
+        "--screenshot-quality",
+        "--screenshot-format",
+        "--idle-timeout",
     ];
 
     let mut i = 0;
@@ -490,7 +771,7 @@ pub fn clean_args(args: &[String]) -> Vec<String> {
             i += 1;
             continue;
         }
-        if GLOBAL_BOOL_FLAGS.contains(&arg.as_str()) || arg == "-f" {
+        if GLOBAL_BOOL_FLAGS.contains(&arg.as_str()) {
             if let Some(v) = args.get(i + 1) {
                 if matches!(v.as_str(), "true" | "false") {
                     i += 1;
@@ -517,6 +798,36 @@ mod tests {
     fn test_parse_headers_flag() {
         let flags = parse_flags(&args(r#"open example.com --headers {"Auth":"token"}"#));
         assert_eq!(flags.headers, Some(r#"{"Auth":"token"}"#.to_string()));
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_raw_ms() {
+        assert_eq!(parse_idle_timeout("10").unwrap(), "10");
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_seconds() {
+        assert_eq!(parse_idle_timeout("10s").unwrap(), "10000");
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_minutes() {
+        assert_eq!(parse_idle_timeout("3m").unwrap(), "180000");
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_hours() {
+        assert_eq!(parse_idle_timeout("1h").unwrap(), "3600000");
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_rejects_capital_m() {
+        assert!(parse_idle_timeout("10M").is_err());
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_rejects_unknown_unit() {
+        assert!(parse_idle_timeout("10x").is_err());
     }
 
     #[test]
@@ -615,6 +926,18 @@ mod tests {
     }
 
     #[test]
+    fn test_clean_args_removes_idle_timeout_before_command() {
+        let cleaned = clean_args(&args("--idle-timeout 10s open example.com"));
+        assert_eq!(cleaned, vec!["open", "example.com"]);
+    }
+
+    #[test]
+    fn test_parse_idle_timeout_flag_converts_to_ms() {
+        let flags = parse_flags(&args("--idle-timeout 10s open example.com"));
+        assert_eq!(flags.idle_timeout.as_deref(), Some("10000"));
+    }
+
+    #[test]
     fn test_parse_flags_with_session_and_executable_path() {
         let flags = parse_flags(&args(
             "--session test --executable-path /custom/chrome open example.com",
@@ -652,6 +975,32 @@ mod tests {
     }
 
     #[test]
+    fn test_cli_annotate_tracking() {
+        let flags = parse_flags(&args("--annotate screenshot"));
+        assert!(flags.cli_annotate);
+        assert!(flags.annotate);
+    }
+
+    #[test]
+    fn test_cli_annotate_not_set_without_flag() {
+        let flags = parse_flags(&args("screenshot"));
+        assert!(!flags.cli_annotate);
+    }
+
+    #[test]
+    fn test_cli_download_path_tracking() {
+        let flags = parse_flags(&args("--download-path /tmp/dl snapshot"));
+        assert!(flags.cli_download_path);
+        assert_eq!(flags.download_path, Some("/tmp/dl".to_string()));
+    }
+
+    #[test]
+    fn test_cli_download_path_not_set_without_flag() {
+        let flags = parse_flags(&args("snapshot"));
+        assert!(!flags.cli_download_path);
+    }
+
+    #[test]
     fn test_cli_multiple_flags_tracking() {
         let flags = parse_flags(&args(
             "--executable-path /chrome --profile /profile --proxy http://proxy snapshot",
@@ -670,7 +1019,6 @@ mod tests {
         let json = r#"{
             "headed": true,
             "json": true,
-            "full": true,
             "debug": true,
             "session": "test-session",
             "sessionName": "my-app",
@@ -693,12 +1041,14 @@ mod tests {
         let config: Config = serde_json::from_str(json).unwrap();
         assert_eq!(config.headed, Some(true));
         assert_eq!(config.json, Some(true));
-        assert_eq!(config.full, Some(true));
         assert_eq!(config.debug, Some(true));
         assert_eq!(config.session.as_deref(), Some("test-session"));
         assert_eq!(config.session_name.as_deref(), Some("my-app"));
         assert_eq!(config.executable_path.as_deref(), Some("/usr/bin/chromium"));
-        assert_eq!(config.extensions, Some(vec!["/ext1".to_string(), "/ext2".to_string()]));
+        assert_eq!(
+            config.extensions,
+            Some(vec!["/ext1".to_string(), "/ext2".to_string()])
+        );
         assert_eq!(config.profile.as_deref(), Some("/tmp/profile"));
         assert_eq!(config.state.as_deref(), Some("/tmp/state.json"));
         assert_eq!(config.proxy.as_deref(), Some("http://proxy:8080"));
@@ -785,6 +1135,22 @@ mod tests {
         let config = read_config_file(&config_path).unwrap();
         assert_eq!(config.headed, Some(true));
         assert_eq!(config.proxy.as_deref(), Some("http://test:1234"));
+
+        let _ = fs::remove_file(&config_path);
+        let _ = fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn test_load_config_from_file_parses_idle_timeout() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join("ab-test-idle-timeout-config");
+        let _ = fs::create_dir_all(&dir);
+        let config_path = dir.join("test-config.json");
+        let mut f = fs::File::create(&config_path).unwrap();
+        writeln!(f, r#"{{"idleTimeout": "10s"}}"#).unwrap();
+
+        let config = read_config_file(&config_path).unwrap();
+        assert_eq!(config.idle_timeout.as_deref(), Some("10000"));
 
         let _ = fs::remove_file(&config_path);
         let _ = fs::remove_dir(&dir);
@@ -951,36 +1317,6 @@ mod tests {
     }
 
     #[test]
-    fn test_full_bare_defaults_true() {
-        let flags = parse_flags(&args("--full open example.com"));
-        assert!(flags.full);
-    }
-
-    #[test]
-    fn test_full_false() {
-        let flags = parse_flags(&args("--full false open example.com"));
-        assert!(!flags.full);
-    }
-
-    #[test]
-    fn test_full_short_flag() {
-        let flags = parse_flags(&args("-f open example.com"));
-        assert!(flags.full);
-    }
-
-    #[test]
-    fn test_clean_args_removes_full_with_value() {
-        let cleaned = clean_args(&args("--full false open example.com"));
-        assert_eq!(cleaned, vec!["open", "example.com"]);
-    }
-
-    #[test]
-    fn test_clean_args_removes_short_full() {
-        let cleaned = clean_args(&args("-f open example.com"));
-        assert_eq!(cleaned, vec!["open", "example.com"]);
-    }
-
-    #[test]
     fn test_clean_args_removes_bool_flag_with_value() {
         let cleaned = clean_args(&args("--headed false --debug true open example.com"));
         assert_eq!(cleaned, vec!["open", "example.com"]);
@@ -1007,7 +1343,11 @@ mod tests {
         let merged = user.merge(project);
         assert_eq!(
             merged.extensions,
-            Some(vec!["/ext1".to_string(), "/ext2".to_string(), "/ext3".to_string()])
+            Some(vec![
+                "/ext1".to_string(),
+                "/ext2".to_string(),
+                "/ext3".to_string()
+            ])
         );
     }
 

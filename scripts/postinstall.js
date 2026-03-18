@@ -20,8 +20,20 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
 const binDir = join(projectRoot, 'bin');
 
+// Detect if the system uses musl libc (e.g. Alpine Linux)
+function isMusl() {
+  if (platform() !== 'linux') return false;
+  try {
+    const result = execSync('ldd --version 2>&1 || true', { encoding: 'utf8' });
+    return result.toLowerCase().includes('musl');
+  } catch {
+    return existsSync('/lib/ld-musl-x86_64.so.1') || existsSync('/lib/ld-musl-aarch64.so.1');
+  }
+}
+
 // Platform detection
-const platformKey = `${platform()}-${arch()}`;
+const osKey = platform() === 'linux' && isMusl() ? 'linux-musl' : platform();
+const platformKey = `${osKey}-${arch()}`;
 const ext = platform() === 'win32' ? '.exe' : '';
 const binaryName = `agent-browser-${platformKey}${ext}`;
 const binaryPath = join(binDir, binaryName);
@@ -80,7 +92,7 @@ async function main() {
     // On global installs, fix npm's bin entry to use native binary directly
     await fixGlobalInstallBin();
     
-    showPlaywrightReminder();
+    showInstallReminder();
     return;
   }
 
@@ -102,8 +114,7 @@ async function main() {
     
     console.log(`✓ Downloaded native binary: ${binaryName}`);
   } catch (err) {
-    console.log(`⚠ Could not download native binary: ${err.message}`);
-    console.log(`  The CLI will use Node.js fallback (slightly slower startup)`);
+    console.log(`Could not download native binary: ${err.message}`);
     console.log('');
     console.log('To build the native binary locally:');
     console.log('  1. Install Rust: https://rustup.rs');
@@ -114,21 +125,64 @@ async function main() {
   // This avoids the /bin/sh error on Windows and provides zero-overhead execution
   await fixGlobalInstallBin();
 
-  showPlaywrightReminder();
+  showInstallReminder();
 }
 
-function showPlaywrightReminder() {
+function findSystemChrome() {
+  const os = platform();
+  if (os === 'darwin') {
+    const candidates = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    ];
+    return candidates.find(p => existsSync(p)) || null;
+  }
+  if (os === 'linux') {
+    const names = ['google-chrome', 'google-chrome-stable', 'chromium-browser', 'chromium'];
+    for (const name of names) {
+      try {
+        const result = execSync(`which ${name} 2>/dev/null`, { encoding: 'utf8' }).trim();
+        if (result) return result;
+      } catch {}
+    }
+    return null;
+  }
+  if (os === 'win32') {
+    const candidates = [
+      `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    ];
+    return candidates.find(p => p && existsSync(p)) || null;
+  }
+  return null;
+}
+
+function showInstallReminder() {
+  const systemChrome = findSystemChrome();
+  if (systemChrome) {
+    console.log('');
+    console.log(`  ✓ System Chrome found: ${systemChrome}`);
+    console.log('    agent-browser will use it automatically.');
+    console.log('');
+    return;
+  }
+
   console.log('');
-  console.log('╔═══════════════════════════════════════════════════════════════════════════╗');
-  console.log('║ To download browser binaries, run:                                        ║');
-  console.log('║                                                                           ║');
-  console.log('║     npx playwright install chromium                                       ║');
-  console.log('║                                                                           ║');
-  console.log('║ On Linux, include system dependencies with:                               ║');
-  console.log('║                                                                           ║');
-  console.log('║     npx playwright install --with-deps chromium                           ║');
-  console.log('║                                                                           ║');
-  console.log('╚═══════════════════════════════════════════════════════════════════════════╝');
+  console.log('  ⚠ No Chrome installation detected.');
+  console.log('  If you plan to use a local browser, run:');
+  console.log('');
+  console.log('    agent-browser install');
+  if (platform() === 'linux') {
+    console.log('');
+    console.log('  On Linux, include system dependencies with:');
+    console.log('');
+    console.log('    agent-browser install --with-deps');
+  }
+  console.log('');
+  console.log('  You can skip this if you use --cdp, --provider, --engine, or --executable-path.');
+  console.log('');
 }
 
 /**
@@ -187,46 +241,42 @@ async function fixUnixSymlink() {
  * We overwrite them to invoke the native .exe directly.
  */
 async function fixWindowsShims() {
-  // Check if this is a global install by looking for npm's global prefix
   let npmBinDir;
   try {
     npmBinDir = execSync('npm prefix -g', { encoding: 'utf8' }).trim();
   } catch {
-    return; // Not a global install or npm not available
+    return;
   }
 
-  // The shims are in the npm prefix directory (not prefix/bin on Windows)
   const cmdShim = join(npmBinDir, 'agent-browser.cmd');
   const ps1Shim = join(npmBinDir, 'agent-browser.ps1');
 
-  // Only fix if shims exist (indicates global install)
+  // Shims may not exist yet during postinstall (npm creates them after
+  // lifecycle scripts). If missing, fall back: the JS wrapper at
+  // bin/agent-browser.js handles Windows correctly via child_process.spawn.
   if (!existsSync(cmdShim)) {
     return;
   }
 
-  // Path to native binary relative to npm prefix
-  const relativeBinaryPath = 'node_modules\\agent-browser\\bin\\agent-browser-win32-x64.exe';
+  // Detect architecture so ARM64 Windows is handled correctly
+  const cpuArch = arch() === 'arm64' ? 'arm64' : 'x64';
+  const relativeBinaryPath = `node_modules\\agent-browser\\bin\\agent-browser-win32-${cpuArch}.exe`;
+  const absoluteBinaryPath = join(npmBinDir, relativeBinaryPath);
+
+  // Only rewrite shims if the native binary actually exists
+  if (!existsSync(absoluteBinaryPath)) {
+    return;
+  }
 
   try {
-    // Overwrite .cmd shim
     const cmdContent = `@ECHO off\r\n"%~dp0${relativeBinaryPath}" %*\r\n`;
     writeFileSync(cmdShim, cmdContent);
 
-    // Overwrite .ps1 shim
-    const ps1Content = `#!/usr/bin/env pwsh
-$basedir = Split-Path $MyInvocation.MyCommand.Definition -Parent
-$exe = ""
-if ($PSVersionTable.PSVersion -lt "6.0" -or $IsWindows) {
-  $exe = ".exe"
-}
-& "$basedir/${relativeBinaryPath.replace(/\\/g, '/')}" $args
-exit $LASTEXITCODE
-`;
+    const ps1Content = `#!/usr/bin/env pwsh\r\n$basedir = Split-Path $MyInvocation.MyCommand.Definition -Parent\r\n& "$basedir\\${relativeBinaryPath}" $args\r\nexit $LASTEXITCODE\r\n`;
     writeFileSync(ps1Shim, ps1Content);
 
     console.log('✓ Optimized: shims point to native binary (zero overhead)');
   } catch (err) {
-    // Permission error or other issue - not critical, JS wrapper still works
     console.log(`⚠ Could not optimize shims: ${err.message}`);
     console.log('  CLI will work via Node.js wrapper (slightly slower startup)');
   }
