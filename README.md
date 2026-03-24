@@ -1,5 +1,6 @@
 # agent-browser
 
+[![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml)
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
 
 ## Installation
@@ -30,8 +31,7 @@ npx agent-browser open example.com
 
 For projects that want to pin the version in `package.json`:
 
-```bash
-npm install agent-browser
+```bash\nnpm install agent-browser
 npx agent-browser install
 ```
 
@@ -51,7 +51,7 @@ agent-browser install  # Download Chromium
 ### From Source
 
 ```bash
-git clone https://github.com/vercel-labs/agent-browser
+git clone https://github.com/dextonai/agent-browser
 cd agent-browser
 pnpm install
 pnpm build
@@ -431,8 +431,7 @@ agent-browser screenshot --annotate
 
 After an annotated screenshot, refs are cached so you can immediately interact with elements:
 
-```bash
-agent-browser screenshot --annotate ./page.png
+```bash\nagent-browser screenshot --annotate ./page.png
 agent-browser click @e2     # Click the "Home" link labeled [2]
 ```
 
@@ -557,8 +556,7 @@ agent-browser find label "Email" fill "test@test.com"
 
 Use `--json` for machine-readable output:
 
-```bash
-agent-browser snapshot --json
+```bash\nagent-browser snapshot --json
 # Returns: {"success":true,"data":{"snapshot":"...","refs":{"e1":{"role":"heading","name":"Title"},...}}}
 
 agent-browser get text @e1 --json
@@ -880,228 +878,10 @@ The daemon starts automatically on first command and persists between commands f
 
 ## Usage with AI Agents
 
-### Just ask the agent
-
-The simplest approach -- just tell your agent to use it:
+### Just ask the agent\n\nThe simplest approach -- just tell your agent to use it:
 
 ```
 Use agent-browser to test the login flow. Run agent-browser --help to see available commands.
 ```
 
-The `--help` output is comprehensive and most agents can figure it out from there.
-
-### AI Coding Assistants (recommended)
-
-Add the skill to your AI coding assistant for richer context:
-
-```bash
-npx skills add vercel-labs/agent-browser
-```
-
-This works with Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, Goose, OpenCode, and Windsurf. The skill is fetched from the repository, so it stays up to date automatically -- do not copy `SKILL.md` from `node_modules` as it will become stale.
-
-### Claude Code
-
-Install as a Claude Code skill:
-
-```bash
-npx skills add vercel-labs/agent-browser
-```
-
-This adds the skill to `.claude/skills/agent-browser/SKILL.md` in your project. The skill teaches Claude Code the full agent-browser workflow, including the snapshot-ref interaction pattern, session management, and timeout handling.
-
-### AGENTS.md / CLAUDE.md
-
-For more consistent results, add to your project or global instructions file:
-
-```markdown
-## Browser Automation
-
-Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
-
-Core workflow:
-1. `agent-browser open <url>` - Navigate to page
-2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
-3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
-4. Re-snapshot after page changes
-```
-
-## Integrations
-
-### iOS Simulator
-
-Control real Mobile Safari in the iOS Simulator for authentic mobile web testing. Requires macOS with Xcode.
-
-**Setup:**
-
-```bash
-# Install Appium and XCUITest driver
-npm install -g appium
-appium driver install xcuitest
-```
-
-**Usage:**
-
-```bash
-# List available iOS simulators
-agent-browser device list
-
-# Launch Safari on a specific device
-agent-browser -p ios --device "iPhone 16 Pro" open https://example.com
-
-# Same commands as desktop
-agent-browser -p ios snapshot -i
-agent-browser -p ios tap @e1
-agent-browser -p ios fill @e2 "text"
-agent-browser -p ios screenshot mobile.png
-
-# Mobile-specific commands
-agent-browser -p ios swipe up
-agent-browser -p ios swipe down 500
-
-# Close session
-agent-browser -p ios close
-```
-
-Or use environment variables:
-
-```bash
-export AGENT_BROWSER_PROVIDER=ios
-export AGENT_BROWSER_IOS_DEVICE="iPhone 16 Pro"
-agent-browser open https://example.com
-```
-
-| Variable | Description |
-|----------|-------------|
-| `AGENT_BROWSER_PROVIDER` | Set to `ios` to enable iOS mode |
-| `AGENT_BROWSER_IOS_DEVICE` | Device name (e.g., "iPhone 16 Pro", "iPad Pro") |
-| `AGENT_BROWSER_IOS_UDID` | Device UDID (alternative to device name) |
-
-**Supported devices:** All iOS Simulators available in Xcode (iPhones, iPads), plus real iOS devices.
-
-**Note:** The iOS provider boots the simulator, starts Appium, and controls Safari. First launch takes ~30-60 seconds; subsequent commands are fast.
-
-#### Real Device Support
-
-Appium also supports real iOS devices connected via USB. This requires additional one-time setup:
-
-**1. Get your device UDID:**
-```bash
-xcrun xctrace list devices
-# or
-system_profiler SPUSBDataType | grep -A 5 "iPhone\|iPad"
-```
-
-**2. Sign WebDriverAgent (one-time):**
-```bash
-# Open the WebDriverAgent Xcode project
-cd ~/.appium/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent
-open WebDriverAgent.xcodeproj
-```
-
-In Xcode:
-- Select the `WebDriverAgentRunner` target
-- Go to Signing & Capabilities
-- Select your Team (requires Apple Developer account, free tier works)
-- Let Xcode manage signing automatically
-
-**3. Use with agent-browser:**
-```bash
-# Connect device via USB, then:
-agent-browser -p ios --device "<DEVICE_UDID>" open https://example.com
-
-# Or use the device name if unique
-agent-browser -p ios --device "John's iPhone" open https://example.com
-```
-
-**Real device notes:**
-- First run installs WebDriverAgent to the device (may require Trust prompt)
-- Device must be unlocked and connected via USB
-- Slightly slower initial connection than simulator
-- Tests against real Safari performance and behavior
-
-### Browserbase
-
-[Browserbase](https://browserbase.com) provides remote browser infrastructure to make deployment of agentic browsing agents easy. Use it when running the agent-browser CLI in an environment where a local browser isn't feasible.
-
-To enable Browserbase, use the `-p` flag:
-
-```bash
-export BROWSERBASE_API_KEY="your-api-key"
-export BROWSERBASE_PROJECT_ID="your-project-id"
-agent-browser -p browserbase open https://example.com
-```
-
-Or use environment variables for CI/scripts:
-
-```bash
-export AGENT_BROWSER_PROVIDER=browserbase
-export BROWSERBASE_API_KEY="your-api-key"
-export BROWSERBASE_PROJECT_ID="your-project-id"
-agent-browser open https://example.com
-```
-
-When enabled, agent-browser connects to a Browserbase session instead of launching a local browser. All commands work identically.
-
-Get your API key and project ID from the [Browserbase Dashboard](https://browserbase.com/overview).
-
-### Browser Use
-
-[Browser Use](https://browser-use.com) provides cloud browser infrastructure for AI agents. Use it when running agent-browser in environments where a local browser isn't available (serverless, CI/CD, etc.).
-
-To enable Browser Use, use the `-p` flag:
-
-```bash
-export BROWSER_USE_API_KEY="your-api-key"
-agent-browser -p browseruse open https://example.com
-```
-
-Or use environment variables for CI/scripts:
-
-```bash
-export AGENT_BROWSER_PROVIDER=browseruse
-export BROWSER_USE_API_KEY="your-api-key"
-agent-browser open https://example.com
-```
-
-When enabled, agent-browser connects to a Browser Use cloud session instead of launching a local browser. All commands work identically.
-
-Get your API key from the [Browser Use Cloud Dashboard](https://cloud.browser-use.com/settings?tab=api-keys). Free credits are available to get started, with pay-as-you-go pricing after.
-
-### Kernel
-
-[Kernel](https://www.kernel.sh) provides cloud browser infrastructure for AI agents with features like stealth mode and persistent profiles.
-
-To enable Kernel, use the `-p` flag:
-
-```bash
-export KERNEL_API_KEY="your-api-key"
-agent-browser -p kernel open https://example.com
-```
-
-Or use environment variables for CI/scripts:
-
-```bash
-export AGENT_BROWSER_PROVIDER=kernel
-export KERNEL_API_KEY="your-api-key"
-agent-browser open https://example.com
-```
-
-Optional configuration via environment variables:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `KERNEL_HEADLESS` | Run browser in headless mode (`true`/`false`) | `false` |
-| `KERNEL_STEALTH` | Enable stealth mode to avoid bot detection (`true`/`false`) | `true` |
-| `KERNEL_TIMEOUT_SECONDS` | Session timeout in seconds | `300` |
-| `KERNEL_PROFILE_NAME` | Browser profile name for persistent cookies/logins (created if it doesn't exist) | (none) |
-
-When enabled, agent-browser connects to a Kernel cloud session instead of launching a local browser. All commands work identically.
-
-**Profile Persistence:** When `KERNEL_PROFILE_NAME` is set, the profile will be created if it doesn't already exist. Cookies, logins, and session data are automatically saved back to the profile when the browser session ends, making them available for future sessions.
-
-Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
-
-## License
-
-Apache-2.0
+The `--help` output is comprehensive and most agents can figure it out from there.\n\n### AI Coding Assistants (recommended)\n\nAdd the skill to your AI coding assistant for richer context:\n\n```bash\nnpx skills add vercel-labs/agent-browser\n```\n\nThis works with Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, Goose, OpenCode, and Windsurf. The skill is fetched from the repository, so it stays up to date automatically -- do not copy `SKILL.md` from `node_modules` as it will become stale.\n\n### Claude Code\n\nInstall as a Claude Code skill:\n\n```bash\nnpx skills add vercel-labs/agent-browser\n```\n\nThis adds the skill to `.claude/skills/agent-browser/SKILL.md` in your project. The skill teaches Claude Code the full agent-browser workflow, including the snapshot-ref interaction pattern, session management, and timeout handling.\n\n### AGENTS.md / CLAUDE.md\n\nFor more consistent results, add to your project or global instructions file:\n\n```markdown\n## Browser Automation\n\nUse `agent-browser` for web automation. Run `agent-browser --help` for all commands.\n\nCore workflow:\n1. `agent-browser open <url>` - Navigate to page\n2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)\n3. `agent-browser click @e1` / `fill @e2 \"text\"` - Interact using refs\n4. Re-snapshot after page changes\n```\n\n## Integrations\n\n### iOS Simulator\n\nControl real Mobile Safari in the iOS Simulator for authentic mobile web testing. Requires macOS with Xcode.\n\n**Setup:**\n\n```bash\n# Install Appium and XCUITest driver\nnpm install -g appium\nappium driver install xcuitest\n```\n\n**Usage:**\n\n```bash\n# List available iOS simulators\nagent-browser device list\n\n# Launch Safari on a specific device\nagent-browser -p ios --device \"iPhone 16 Pro\" open https://example.com\n\n# Same commands as desktop\nagent-browser -p ios snapshot -i\nagent-browser -p ios tap @e1\nagent-browser -p ios fill @e2 \"text\"\nagent-browser -p ios screenshot mobile.png\n\n# Mobile-specific commands\nagent-browser -p ios swipe up\nagent-browser -p ios swipe down 500\n\n# Close session\nagent-browser -p ios close\n```\n\nOr use environment variables:\n\n```bash\nexport AGENT_BROWSER_PROVIDER=ios\nexport AGENT_BROWSER_IOS_DEVICE=\"iPhone 16 Pro\"\nagent-browser open https://example.com\n```\n\n| Variable | Description |\n|----------|-------------|\n| `AGENT_BROWSER_PROVIDER` | Set to `ios` to enable iOS mode |\n| `AGENT_BROWSER_IOS_DEVICE` | Device name (e.g., \"iPhone 16 Pro\", \"iPad Pro\") |\n| `AGENT_BROWSER_IOS_UDID` | Device UDID (alternative to device name) |\n\n**Supported devices:** All iOS Simulators available in Xcode (iPhones, iPads), plus real iOS devices.\n\n**Note:** The iOS provider boots the simulator, starts Appium, and controls Safari. First launch takes ~30-60 seconds; subsequent commands are fast.\n\n#### Real Device Support\n\nAppium also supports real iOS devices connected via USB. This requires additional one-time setup:\n\n**1. Get your device UDID:**\n```bash\nxcrun xctrace list devices\n# or\nsystem_profiler SPUSBDataType | grep -A 5 \"iPhone\\|iPad\"\n```\n\n**2. Sign WebDriverAgent (one-time):**\n```bash\n# Open the WebDriverAgent Xcode project\ncd ~/.appium/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent\nopen WebDriverAgent.xcodeproj\n```\n\nIn Xcode:\n- Select the `WebDriverAgentRunner` target\n- Go to Signing & Capabilities\n- Select your Team (requires Apple Developer account, free tier works)\n- Let Xcode manage signing automatically\n\n**3. Use with agent-browser:**\n```bash\n# Connect device via USB, then:\nagent-browser -p ios --device \"<DEVICE_UDID>\" open https://example.com\n\n# Or use the device name if unique\nagent-browser -p ios --device \"John's iPhone\" open https://example.com\n```\n\n**Real device notes:**\n- First run installs WebDriverAgent to the device (may require Trust prompt)\n- Device must be unlocked and connected via USB\n- Slightly slower initial connection than simulator\n- Tests against real Safari performance and behavior\n\n### Browserbase\n\n[Browserbase](https://browserbase.com) provides remote browser infrastructure to make deployment of agentic browsing agents easy. Use it when running the agent-browser CLI in an environment where a local browser isn't feasible.\n\nTo enable Browserbase, use the `-p` flag:\n\n```bash\nexport BROWSERBASE_API_KEY=\"your-api-key\"\nexport BROWSERBASE_PROJECT_ID=\"your-project-id\"\nagent-browser -p browserbase open https://example.com\n```\n\nOr use environment variables for CI/scripts:\n\n```bash\nexport AGENT_BROWSER_PROVIDER=browserbase\nexport BROWSERBASE_API_KEY=\"your-api-key\"\nexport BROWSERBASE_PROJECT_ID=\"your-project-id\"\nagent-browser open https://example.com\n```\n\nWhen enabled, agent-browser connects to a Browserbase session instead of launching a local browser. All commands work identically.\n\nGet your API key and project ID from the [Browserbase Dashboard](https://browserbase.com/overview).\n\n### Browser Use\n\n[Browser Use](https://browser-use.com) provides cloud browser infrastructure for AI agents. Use it when running agent-browser in environments where a local browser isn't available (serverless, CI/CD, etc.).\n\nTo enable Browser Use, use the `-p` flag:\n\n```bash\nexport BROWSER_USE_API_KEY=\"your-api-key\"\nagent-browser -p browseruse open https://example.com\n```\n\nOr use environment variables for CI/scripts:\n\n```bash\nexport AGENT_BROWSER_PROVIDER=browseruse\nexport BROWSER_USE_API_KEY=\"your-api-key\"\nagent-browser open https://example.com\n```\n\nWhen enabled, agent-browser connects to a Browser Use cloud session instead of launching a local browser. All commands work identically.\n\nGet your API key from the [Browser Use Cloud Dashboard](https://cloud.browser-use.com/settings?tab=api-keys). Free credits are available to get started, with pay-as-you-go pricing after.\n\n### Kernel\n\n[Kernel](https://www.kernel.sh) provides cloud browser infrastructure for AI agents with features like stealth mode and persistent profiles.\n\nTo enable Kernel, use the `-p` flag:\n\n```bash\nexport KERNEL_API_KEY=\"your-api-key\"\nagent-browser -p kernel open https://example.com\n```\n\nOr use environment variables for CI/scripts:\n\n```bash\nexport AGENT_BROWSER_PROVIDER=kernel\nexport KERNEL_API_KEY=\"your-api-key\"\nagent-browser open https://example.com\n```\n\nOptional configuration via environment variables:\n\n| Variable | Description | Default |\n|----------|-------------|---------|\n| `KERNEL_HEADLESS` | Run browser in headless mode (`true`/`false`) | `false` |\n| `KERNEL_STEALTH` | Enable stealth mode to avoid bot detection (`true`/`false`) | `true` |\n| `KERNEL_TIMEOUT_SECONDS` | Session timeout in seconds | `300` |\n| `KERNEL_PROFILE_NAME` | Browser profile name for persistent cookies/logins (created if it doesn't exist) | (none) |\n\nWhen enabled, agent-browser connects to a Kernel cloud session instead of launching a local browser. All commands work identically.\n\n**Profile Persistence:** When `KERNEL_PROFILE_NAME` is set, the profile will be created if it doesn't already exist. Cookies, logins, and session data are automatically saved back to the profile when the browser session ends, making them available for future sessions.\n\nGet your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).\n\n## License\n\nApache-2.0\n
