@@ -1,3 +1,5 @@
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]
+
 # agent-browser
 
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
