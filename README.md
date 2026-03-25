@@ -1105,3 +1105,4 @@ Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
 ## License
 
 Apache-2.0
+[![Bounty](https://img.shields.io/badge/bounty-active-green)](https://algora.io)
