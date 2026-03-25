@@ -1,5 +1,10 @@
 # agent-browser
 
+[![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml)
+[![npm version](https://badge.fury.io/js/agent-browser.svg)](https://badge.fury.io/js/agent-browser)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
 
 ## Installation
