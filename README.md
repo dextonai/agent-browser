@@ -1,5 +1,7 @@
 # agent-browser
 
+[![Build Status](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions)
+
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
 
 ## Installation
