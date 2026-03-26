@@ -1,5 +1,9 @@
 # agent-browser
 
+[![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/agent-browser)](https://www.npmjs.com/package/agent-browser)
+[![License](https://img.shields.io/github/license/dextonai/agent-browser)](./LICENSE)
+
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
 
 ## Installation
@@ -1101,6 +1105,10 @@ When enabled, agent-browser connects to a Kernel cloud session instead of launch
 **Profile Persistence:** When `KERNEL_PROFILE_NAME` is set, the profile will be created if it doesn't already exist. Cookies, logins, and session data are automatically saved back to the profile when the browser session ends, making them available for future sessions.
 
 Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for setup instructions, coding style, and how to submit a PR.
 
 ## License
 
