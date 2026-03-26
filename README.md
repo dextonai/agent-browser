@@ -1,5 +1,9 @@
 # agent-browser
 
+[![npm version](https://badge.fury.io/js/agent-browser.svg)](https://www.npmjs.com/package/agent-browser)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
+
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
 
 ## Installation
