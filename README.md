@@ -1,5 +1,7 @@
 # agent-browser
 
+[![Build](https://github.com/vercel-labs/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/vercel-labs/agent-browser/actions/workflows/ci.yml)
+
 Headless browser automation CLI for AI agents. Fast Rust CLI with Node.js fallback.
 
 ## Installation
