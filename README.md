@@ -1,4 +1,5 @@
 # agent-browser
+[![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml)
 
 Headless browser automation CLI for AI agents. Fast native Rust CLI.
 
