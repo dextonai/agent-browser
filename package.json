@@ -1,7 +1,7 @@
 {
   "name": "agent-browser",
-  "version": "0.23.0",
-  "description": "Headless browser automation CLI for AI agents",
+  "version": "0.23.2",
+  "description": "Browser automation CLI for AI agents",
   "type": "module",
   "files": [
     "bin",
@@ -44,7 +44,7 @@
   "bugs": {
     "url": "https://github.com/vercel-labs/agent-browser/issues"
   },
-  "homepage": "https://github.com/vercel-labs/agent-browser#readme",
+  "homepage": "https://agent-browser.dev",
   "devDependencies": {
     "@changesets/cli": "^2.29.8"
   }

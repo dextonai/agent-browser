@@ -1619,8 +1619,13 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
                 return launch_safari(cmd, state).await;
             }
             _ => {
-                let (ws_url, provider_session) = providers::connect_provider(provider).await?;
-                match BrowserManager::connect_cdp(&ws_url).await {
+                let conn = providers::connect_provider(provider).await?;
+                let connect_result = if conn.direct_page {
+                    BrowserManager::connect_cdp_direct(&conn.ws_url).await
+                } else {
+                    BrowserManager::connect_cdp(&conn.ws_url).await
+                };
+                match connect_result {
                     Ok(mgr) => {
                         state.reset_input_state();
                         state.browser = Some(mgr);
@@ -1628,10 +1633,11 @@ async fn handle_launch(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
                         state.start_fetch_handler();
                         state.start_dialog_handler();
                         state.update_stream_client().await;
+                        write_provider_file(&state.session_id, provider);
                         return Ok(json!({ "launched": true, "provider": provider }));
                     }
                     Err(e) => {
-                        if let Some(ref ps) = provider_session {
+                        if let Some(ref ps) = conn.session {
                             providers::close_provider_session(ps).await;
                         }
                         return Err(e);
@@ -1814,6 +1820,7 @@ async fn launch_ios(cmd: &Value, state: &mut DaemonState) -> Result<Value, Strin
     state.backend_type = BackendType::WebDriver;
     state.engine = "safari".to_string();
     write_engine_file(&state.session_id, &state.engine);
+    write_provider_file(&state.session_id, "ios");
     write_extensions_file(&state.session_id);
     state.reset_input_state();
 
@@ -1861,6 +1868,7 @@ async fn launch_safari(cmd: &Value, state: &mut DaemonState) -> Result<Value, St
     state.backend_type = BackendType::WebDriver;
     state.engine = "safari".to_string();
     write_engine_file(&state.session_id, &state.engine);
+    write_provider_file(&state.session_id, "safari");
     write_extensions_file(&state.session_id);
     state.reset_input_state();
 
@@ -4559,6 +4567,18 @@ fn remove_engine_file(session_id: &str) {
     let _ = fs::remove_file(engine_file_path(session_id));
 }
 
+fn provider_file_path(session_id: &str) -> PathBuf {
+    get_socket_dir().join(format!("{}.provider", session_id))
+}
+
+fn write_provider_file(session_id: &str, provider: &str) {
+    let _ = fs::write(provider_file_path(session_id), provider);
+}
+
+fn remove_provider_file(session_id: &str) {
+    let _ = fs::remove_file(provider_file_path(session_id));
+}
+
 fn extensions_file_path(session_id: &str) -> PathBuf {
     get_socket_dir().join(format!("{}.extensions", session_id))
 }
@@ -4648,6 +4668,7 @@ async fn handle_stream_disable(state: &mut DaemonState) -> Result<Value, String>
     state.stream_client = None;
     remove_stream_file(&state.session_id)?;
     remove_engine_file(&state.session_id);
+    remove_provider_file(&state.session_id);
 
     Ok(json!({ "disabled": true }))
 }
