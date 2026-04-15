@@ -1,3 +1,5 @@
+[![Build Status](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions)
+
 # agent-browser
 
 Browser automation CLI for AI agents. Fast native Rust CLI.
