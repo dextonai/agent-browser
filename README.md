@@ -1,3 +1,5 @@
+[![CI](https://github.com/vercel-labs/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/vercel-labs/agent-browser/actions/workflows/ci.yml)
+
 # agent-browser
 
 Browser automation CLI for AI agents. Fast native Rust CLI.
