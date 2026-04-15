@@ -1,3 +1,5 @@
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]
+
 # agent-browser
 
 Browser automation CLI for AI agents. Fast native Rust CLI.
