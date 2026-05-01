@@ -1,5 +1,7 @@
 # agent-browser
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
 ## Installation
