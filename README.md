@@ -1317,6 +1317,12 @@ When enabled, agent-browser connects to a Kernel cloud session instead of launch
 
 Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
 
+## Troubleshooting
+
+- **Rust Toolchain Mismatch:** Run `rustup override set nightly`.
+- **Node.js Version:** Version 18+ is required.
+- **Build Errors:** Ensure `build-essential` is installed.
+
 ## License
 
 Apache-2.0
