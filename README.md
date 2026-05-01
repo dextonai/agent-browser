@@ -2,6 +2,16 @@
 
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
+## Features
+
+- **High-Performance Automation Engine**: Optimized low-latency browser automation with native Rust backend for superior speed and efficiency
+- **AI-Friendly Interface**: Designed with semantic locators and accessibility tree snapshots for seamless integration with AI agents
+- **Cross-Platform Compatibility**: Works across Windows, macOS, and Linux with consistent behavior
+- **Advanced Network Control**: Capability to intercept, modify, and mock network requests for testing and debugging
+- **State Management**: Persistent session handling with support for profile-based, session-based, and state file-based authentication
+- **Visual and Structural Diffing**: Comprehensive comparison tools for visual and structural differences between web pages
+- **Enhanced Debugging Tools**: Built-in console, error tracking, and profiling capabilities for detailed debugging
+
 ## Installation
 
 ### Global Installation (recommended)
