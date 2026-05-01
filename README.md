@@ -1317,18 +1317,12 @@ When enabled, agent-browser connects to a Kernel cloud session instead of launch
 
 Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
 
+## Troubleshooting
+
+- **Rust Toolchain Mismatch:** Run `rustup override set nightly`.
+- **Node.js Version:** Version 18+ is required.
+- **Build Errors:** Ensure `build-essential` is installed.
+
 ## License
 
 Apache-2.0
-
-## Roadmap
-### Phase 1: Foundation (Current)
-- Core browser agent logic
-- MIT License stabilization
-- Contribution guidelines
-### Phase 2: Agent Intelligence
-- Improved semantic locators
-- AI-driven state persistence
-### Phase 3: Ecosystem Integration
-- Browser extension support
-- Multi-agent collaboration protocols
