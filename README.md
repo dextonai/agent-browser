@@ -1320,3 +1320,15 @@ Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
 ## License
 
 Apache-2.0
+
+## Roadmap
+### Phase 1: Foundation (Current)
+- Core browser agent logic
+- MIT License stabilization
+- Contribution guidelines
+### Phase 2: Agent Intelligence
+- Improved semantic locators
+- AI-driven state persistence
+### Phase 3: Ecosystem Integration
+- Browser extension support
+- Multi-agent collaboration protocols
