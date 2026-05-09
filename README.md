@@ -1,4 +1,5 @@
 # agent-browser
+\n[![npm version](https://img.shields.io/npm/v/agent-browser)](https://www.npmjs.com/package/agent-browser) [![License](https://img.shields.io/github/license/dextonai/agent-browser)](LICENSE)
 
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
