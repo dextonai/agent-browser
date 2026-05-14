@@ -1,5 +1,9 @@
 # agent-browser
 
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/agent-browser.svg)](https://www.npmjs.com/package/agent-browser)
+[![Contributing](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
 ## Installation
