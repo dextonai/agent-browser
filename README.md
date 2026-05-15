@@ -1,5 +1,7 @@
 # agent-browser
 
+[![npm version](https://img.shields.io/npm/v/agent-browser.svg)](https://www.npmjs.com/package/agent-browser) [![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions)
+
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
 ## Installation
