@@ -1,5 +1,9 @@
 # agent-browser
 
+[![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml)
+[![npm version](https://badge.fury.io/js/agent-browser.svg)](https://badge.fury.io/js/agent-browser)
+[![License](https://img.shields.io/github/license/dextonai/agent-browser.svg)](LICENSE)
+
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
 ## Installation
