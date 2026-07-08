@@ -1,6 +1,16 @@
 # agent-browser
 
-Browser automation CLI for AI agents. Fast native Rust CLI.
+Browser automation for AI agents should be fast, native, and invisible. Not a
+Docker container running a full Chromium that takes three seconds to start and
+burns 500MB of RAM. Not a Puppeteer wrapper that leaks memory across sessions.
+Just a Rust binary that opens a page, reads the DOM, and gets out of the way.
+
+agent-browser is a native Rust CLI that gives AI agents a fast, lightweight
+browser surface. It downloads Chrome from Chrome for Testing on first run,
+handles session lifecycle automatically, and returns clean page content in
+milliseconds instead of seconds. It exists because browser automation tools
+were built for humans writing test suites, not for agents making dozens of
+rapid page reads in a single conversation turn.
 
 ## Installation
 
