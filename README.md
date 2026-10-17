@@ -1,5 +1,7 @@
 # agent-browser
 
+[![CI](https://github.com/dextonai/agent-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/dextonai/agent-browser/actions)
+
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
 ## Installation
@@ -1320,3 +1322,7 @@ Get your API key from the [Kernel Dashboard](https://dashboard.onkernel.com).
 ## License
 
 Apache-2.0
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, style, and PR guidelines.
